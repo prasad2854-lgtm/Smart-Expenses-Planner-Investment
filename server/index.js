@@ -202,8 +202,8 @@ app.post('/api/transactions/automated', authenticateToken, async (req, res) => {
             stateData = stateRes.rows[0].state_data;
         }
 
-        // Advanced Regex parsing for Indian currency formats (₹, Rs, INR, etc)
-        const amountMatch = data.match(/(?:Rs\.?|INR|₹)\s*([\d,]+(?:\.\d{1,2})?)/i) || data.match(/([\d,]+(?:\.\d{1,2})?)\s*(?:INR)/i) || data.match(/paid\s*₹?\s*([\d,]+(?:\.\d{1,2})?)/i);
+        // Advanced Regex parsing for Indian currency formats (₹, Rs, Rs., Rs:, INR, etc)
+        const amountMatch = data.match(/(?:Rs\.?:?|INR|₹)\s*([\d,]+(?:\.\d{1,2})?)/i) || data.match(/([\d,]+(?:\.\d{1,2})?)\s*(?:INR)/i) || data.match(/paid\s*₹?\s*([\d,]+(?:\.\d{1,2})?)/i);
         let amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
 
         // Skip if no amount

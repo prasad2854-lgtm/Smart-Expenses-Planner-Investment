@@ -97,35 +97,35 @@ const App: React.FC = () => {
     };
     checkAuth();
   }, []);
+  const fetchState = React.useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/state`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const parsed = await res.json();
+        Object.keys(parsed.profiles || {}).forEach(key => {
+          if (parsed.profiles[key].hasOwnHouse === undefined) {
+            parsed.profiles[key].hasOwnHouse = true;
+          }
+          if (!parsed.profiles[key].allocation) {
+            parsed.profiles[key].allocation = { ...DEFAULT_ALLOCATION };
+          }
+        });
+        setState(parsed);
+      }
+    } catch (err) {
+      console.error("Failed to fetch state from DB", err);
+    } finally {
+      setIsInitializing(false);
+    }
+  }, [token]);
 
   useEffect(() => {
     if (isAuthChecking || !token) return;
-    const fetchState = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/state`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const parsed = await res.json();
-          // Normalize and migrate housing status for all existing profiles
-          Object.keys(parsed.profiles || {}).forEach(key => {
-            if (parsed.profiles[key].hasOwnHouse === undefined) {
-              parsed.profiles[key].hasOwnHouse = true;
-            }
-            if (!parsed.profiles[key].allocation) {
-              parsed.profiles[key].allocation = { ...DEFAULT_ALLOCATION };
-            }
-          });
-          setState(parsed);
-        }
-      } catch (err) {
-        console.error("Failed to fetch state from DB", err);
-      } finally {
-        setIsInitializing(false);
-      }
-    };
     fetchState();
-  }, [isAuthChecking, token]);
+  }, [isAuthChecking, token, fetchState]);
 
   useEffect(() => {
     if (state.onboarded && !isInitializing && token) {
@@ -413,7 +413,7 @@ const App: React.FC = () => {
       <main className="flex-1 px-6 no-scrollbar overflow-y-auto">
         {activeTab === 'dashboard' && (
           <div className="space-y-6 pb-6">
-            <Dashboard state={activeState} onUpdate={(u) => setState(prev => ({ ...prev, ...u }))} />
+            <Dashboard state={activeState} onUpdate={(u) => setState(prev => ({ ...prev, ...u }))} onRefresh={fetchState} />
             <CashWallet profile={activeProfile} updateProfile={updateProfileData} />
             <BudgetPlanner state={activeState} onUpdateCategoryBudget={(cat, amt) => updateProfileData({ categoryBudgets: { ...(activeProfile.categoryBudgets || {}), [cat]: amt } })} />
           </div>

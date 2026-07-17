@@ -24,14 +24,17 @@ public class SmsScraperReceiver extends BroadcastReceiver {
                     String sender = smsMessage.getDisplayOriginatingAddress();
                     String messageBody = smsMessage.getMessageBody();
 
-                    // Basic heuristic: Bank sender typically format like "VM-HDFCBK" etc.
-                    if (sender != null && sender.matches(".*[A-Za-z]{2}-.*")) {
-                        if (messageBody.toLowerCase().contains("debited")
-                                || messageBody.toLowerCase().contains("credited")
-                                || messageBody.toLowerCase().contains("a/c")) {
-                            Log.d(TAG, "Bank SMS! Sender: " + sender + ", Body: " + messageBody);
-                            sendToBackend(context, sender, messageBody);
-                        }
+                    // Let the Cloud Backend API handle the exact numeric regex validation.
+                    // Just forward any message that looks remotely financial.
+                    if (messageBody.toLowerCase().contains("debited")
+                            || messageBody.toLowerCase().contains("credited")
+                            || messageBody.toLowerCase().contains("paid")
+                            || messageBody.toLowerCase().contains("spent")
+                            || messageBody.toLowerCase().contains("sent")
+                            || messageBody.toLowerCase().contains("received")
+                            || messageBody.toLowerCase().contains("a/c")) {
+                        Log.d(TAG, "Finance SMS! Sender: " + sender + ", Body: " + messageBody);
+                        sendToBackend(context, sender, messageBody);
                     }
                 }
             }
