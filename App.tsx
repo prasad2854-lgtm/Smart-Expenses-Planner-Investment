@@ -373,7 +373,7 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-slate-50 flex flex-col p-8 items-center justify-center text-center text-black">
         {onboardingStep === 0 && (
           <div className="w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <img src="/icon.png" alt="SEPI Logo" className="w-24 h-24 mb-8 mx-auto shadow-2xl rounded-3xl" />
+            <img src="./icon.png" alt="SEPI Logo" className="w-24 h-24 mb-8 mx-auto shadow-2xl rounded-3xl" />
             <h1 className="text-3xl font-bold mb-2 text-slate-900 leading-tight">Smart Expenses Planner & Investment</h1>
             <p className="opacity-70 mb-12">Select your profile to begin.</p>
             <div className="space-y-4">
