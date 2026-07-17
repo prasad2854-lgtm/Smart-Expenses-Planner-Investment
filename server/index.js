@@ -5,7 +5,11 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import crypto from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_for_dev';
@@ -169,8 +173,88 @@ app.post('/api/state', authenticateToken, async (req, res) => {
     }
 });
 
+app.delete('/api/state', authenticateToken, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM app_states WHERE id = $1', [req.user.id]);
+        res.json({ success: true, message: 'Profile reset successfully' });
+    } catch (err) {
+        console.error("Error resetting state:", err);
+        res.status(500).json({ error: 'Server error resetting state' });
+    }
+});
+
+app.post('/api/transactions/automated', authenticateToken, async (req, res) => {
+    try {
+        const { source, title, data, type } = req.body;
+        // Fetch current user's state
+        const stateRes = await pool.query('SELECT state_data FROM app_states WHERE id = $1', [req.user.id]);
+
+        let stateData = {
+            profiles: {},
+            operations: [],
+            userType: 'EMPLOYEE',
+            monthlyLimit: 0,
+            hasOwnHouse: true,
+            fixedRent: 0
+        };
+
+        if (stateRes.rows.length > 0 && stateRes.rows[0].state_data) {
+            stateData = stateRes.rows[0].state_data;
+        }
+
+        // Basic Regex parsing heuristic for the amount
+        const amountMatch = data.match(/(?:Rs\.?|INR)\s*([\d,]+(?:\.\d{1,2})?)/i) || data.match(/([\d,]+(?:\.\d{1,2})?)\s*(?:INR)/i);
+        let amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
+
+        // Skip if no amount
+        if (amount <= 0) return res.json({ success: true, message: 'Ignored: No amount parsed.' });
+
+        // Heuristic fallback for debit vs credit
+        const isCredit = data.toLowerCase().includes('credited') || data.toLowerCase().includes('received');
+        const operationType = isCredit ? 'income' : 'expense';
+
+        const category = isCredit ? 'Other Income' : 'Miscellaneous';
+
+        const newOperation = {
+            id: crypto.randomUUID(),
+            type: operationType,
+            amount: amount,
+            category: category,
+            date: new Date().toISOString().split('T')[0],
+            description: `[Auto] ${type.toUpperCase()}: ${source} - ${title}`,
+        };
+
+        // Prepend it 
+        if (!stateData.operations) stateData.operations = [];
+        stateData.operations.unshift(newOperation);
+
+        // Save state back to db
+        await pool.query(
+            `INSERT INTO app_states (id, state_data, updated_at) 
+             VALUES ($1, $2, CURRENT_TIMESTAMP) 
+             ON CONFLICT (id) 
+             DO UPDATE SET state_data = $2, updated_at = CURRENT_TIMESTAMP`,
+            [req.user.id, JSON.stringify(stateData)]
+        );
+
+        res.json({ success: true, message: 'Automated transaction added successfully' });
+    } catch (err) {
+        console.error("Auto transaction error:", err);
+        res.status(500).json({ error: 'Server error processing automated transaction' });
+    }
+});
+
 // Make sure to delete the /api/state without auth
 
+// --- Serve React Static Frontend ---
+app.use(express.static(path.join(__dirname, '../dist')));
+
+app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+        return next();
+    }
+    res.sendFile(path.join(__dirname, '../dist/index.html'));
+});
 app.listen(PORT, () => {
     console.log(`Express server running on http://localhost:${PORT}`);
 });

@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret_db_password
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  app:
+    build: .
+    restart: always
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgres://postgres:secret_db_password@db:5432/postgres
+      JWT_SECRET: super_secure_jwt_secret_in_prod
+      VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    ports:
+      - "3001:3001"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

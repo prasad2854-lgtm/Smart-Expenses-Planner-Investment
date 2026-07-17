@@ -9,6 +9,8 @@ import { GoalList } from './components/GoalList';
 import { Insights } from './components/Insights';
 import { Settings } from './components/Settings';
 import { NotificationToast, ToastType } from './components/NotificationToast';
+import { CashWallet } from './components/CashWallet';
+import { BudgetPlanner } from './components/BudgetPlanner';
 import { Auth } from './components/Auth';
 import {
   LayoutDashboard,
@@ -24,8 +26,9 @@ import {
   Building2
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
 
-const API_BASE_URL = Capacitor.isNativePlatform() ? 'http://10.199.6.202:3001' : '';
+const API_BASE_URL = Capacitor.isNativePlatform() ? 'http://127.0.0.1:3001' : '';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'income' | 'expenses' | 'goals' | 'insights' | 'settings'>('dashboard');
@@ -82,16 +85,18 @@ const App: React.FC = () => {
         } else {
           setToken(null);
           localStorage.removeItem('auth_token');
+          if (Capacitor.isNativePlatform()) await Preferences.remove({ key: 'auth_token' });
         }
       } catch (err) {
         setToken(null);
         localStorage.removeItem('auth_token');
+        if (Capacitor.isNativePlatform()) await Preferences.remove({ key: 'auth_token' });
       } finally {
         setIsAuthChecking(false);
       }
     };
     checkAuth();
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     if (isAuthChecking || !token) return;
@@ -135,15 +140,21 @@ const App: React.FC = () => {
     }
   }, [state, isInitializing, token]);
 
-  const handleLogin = (newToken: string, newUser: any) => {
+  const handleLogin = async (newToken: string, newUser: any) => {
     localStorage.setItem('auth_token', newToken);
+    if (Capacitor.isNativePlatform()) {
+      await Preferences.set({ key: 'auth_token', value: newToken });
+    }
     setToken(newToken);
     setUser(newUser);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (!confirm('Are you sure you want to logout?')) return;
     localStorage.removeItem('auth_token');
+    if (Capacitor.isNativePlatform()) {
+      await Preferences.remove({ key: 'auth_token' });
+    }
     setToken(null);
     setUser(null);
     setState({
@@ -396,14 +407,17 @@ const App: React.FC = () => {
             {state.userType ? `${state.userType} Account` : 'Welcome, ' + (user?.name || user?.email?.split('@')[0])} {state.userType && state.userType !== UserType.BUSINESS && `• ${activeProfile.hasOwnHouse ? 'Owned' : 'Rented'}`}
           </p>
         </div>
-        <div className="w-12 h-12 bg-white rounded-2xl border-2 border-slate-100 shadow-sm overflow-hidden ring-4 ring-slate-100 relative group cursor-pointer" onClick={handleLogout}>
-          <img src={`https://picsum.photos/seed/${user?.id || state.userType || '1'}/120/120`} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black/60 hidden group-hover:flex items-center justify-center text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">Logout</div>
-        </div>
+
       </header>
 
       <main className="flex-1 px-6 no-scrollbar overflow-y-auto">
-        {activeTab === 'dashboard' && <Dashboard state={activeState} onUpdate={(u) => setState(prev => ({ ...prev, ...u }))} />}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6 pb-6">
+            <Dashboard state={activeState} onUpdate={(u) => setState(prev => ({ ...prev, ...u }))} />
+            <CashWallet profile={activeProfile} updateProfile={updateProfileData} />
+            <BudgetPlanner state={activeState} onUpdateCategoryBudget={(cat, amt) => updateProfileData({ categoryBudgets: { ...(activeProfile.categoryBudgets || {}), [cat]: amt } })} />
+          </div>
+        )}
         {activeTab === 'income' && <IncomeList state={activeState} onAdd={addIncome} onDelete={(id) => updateProfileData({ incomeSources: activeProfile.incomeSources.filter(i => i.id !== id) })} />}
         {activeTab === 'expenses' && <ExpenseList state={activeState} onAdd={(e) => updateProfileData({ expenses: [{ ...e, id: Math.random().toString(36).substr(2, 9) }, ...activeProfile.expenses] })} onDelete={(id) => updateProfileData({ expenses: activeProfile.expenses.filter(e => e.id !== id) })} />}
         {activeTab === 'goals' && <GoalList state={activeState} onAdd={(g) => updateProfileData({ goals: [{ ...g, id: Math.random().toString(36).substr(2, 9) }, ...activeProfile.goals] })} onDelete={(id) => updateProfileData({ goals: activeProfile.goals.filter(g => g.id !== id) })} />}
@@ -414,12 +428,38 @@ const App: React.FC = () => {
             onUpdate={(u) => setState(prev => ({ ...prev, ...u }))}
             onUpdateProfile={updateProfileData}
             onSetHousing={setHousingStatus}
-            onReset={() => {
-              if (confirm("Reset everything?")) {
-                fetch(`${API_BASE_URL}/api/state`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } })
-                  .then(() => window.location.reload())
-                  .catch(err => console.error(err));
+            onReset={async () => {
+              if (confirm("Are you incredibly sure you want to reset and permanently delete all your profiles?")) {
+                try {
+                  await fetch(`${API_BASE_URL}/api/state`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                  alert('Profile reset successfully!');
+                  // Force local state to raw initial
+                  setState({
+                    userType: null,
+                    profiles: {
+                      [UserType.EMPLOYEE]: createInitialProfile(),
+                      [UserType.BUSINESS]: createInitialProfile(),
+                      [UserType.STUDENT]: createInitialProfile(),
+                    },
+                    currency: '₹',
+                    onboarded: false
+                  });
+                  setOnboardingStep(0);
+                  setActiveTab('dashboard');
+                } catch (err) {
+                  console.error(err);
+                  alert('Failed to reset profile.');
+                }
               }
+            }}
+            onLogout={async () => {
+              localStorage.removeItem('auth_token');
+              if (Capacitor.isNativePlatform()) {
+                await Preferences.remove({ key: 'auth_token' });
+              }
+              setToken(null);
+              setUser(null);
+              setActiveTab('dashboard');
             }}
           />
         )}

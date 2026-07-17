@@ -5,7 +5,7 @@ import { NotificationToast, ToastType } from './NotificationToast';
 import { Capacitor } from '@capacitor/core';
 
 const GOOGLE_CLIENT_ID = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID || 'dummy-client-id';
-const API_BASE_URL = Capacitor.isNativePlatform() ? 'http://10.199.6.202:3001' : '';
+const API_BASE_URL = Capacitor.isNativePlatform() ? 'http://127.0.0.1:3001' : '';
 
 interface AuthProps {
     onLogin: (token: string, user: any) => void;
@@ -41,7 +41,13 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                 body: JSON.stringify(body)
             });
 
-            const data = await res.json();
+            let data;
+            try {
+                data = await res.json();
+            } catch (jsonErr) {
+                if (!res.ok) throw new Error("Backend server is offline! Restart terminal.");
+                throw new Error("Invalid response format from server");
+            }
 
             if (!res.ok) {
                 throw new Error(data.error || 'Authentication failed');
