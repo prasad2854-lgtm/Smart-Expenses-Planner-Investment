@@ -224,9 +224,13 @@ app.post('/api/transactions/automated', authenticateToken, async (req, res) => {
             description: `[Auto] ${type.toUpperCase()}: ${source} - ${title}`,
         };
 
-        // Prepend it 
-        if (!stateData.operations) stateData.operations = [];
-        stateData.operations.unshift(newOperation);
+        if (isCredit) {
+            if (!stateData.incomeSources) stateData.incomeSources = [];
+            stateData.incomeSources.unshift(newOperation);
+        } else {
+            if (!stateData.expenses) stateData.expenses = [];
+            stateData.expenses.unshift(newOperation);
+        }
 
         // Save state back to db
         await pool.query(
