@@ -5,6 +5,8 @@ import { CURRENCIES, DEFAULT_ALLOCATION } from '../constants';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 
 interface SettingsProps {
   state: AppState & ProfileData;
@@ -41,7 +43,7 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
 
   const handleExportExcel = () => {
     setIsExportingExcel(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         const expensesSheet = XLSX.utils.json_to_sheet(state.expenses.map(e => ({
           Date: e.date,
@@ -53,7 +55,7 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
 
         const incomeSheet = XLSX.utils.json_to_sheet(state.incomeSources.map(i => ({
           Date: i.date,
-          Category: i.category,
+          Category: i.type,
           Amount: i.amount,
           Note: i.note
         })));
@@ -70,7 +72,18 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
         XLSX.utils.book_append_sheet(workbook, incomeSheet, 'Income');
         XLSX.utils.book_append_sheet(workbook, goalsSheet, 'Goals');
 
-        XLSX.writeFile(workbook, `SIP_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+        const fileName = `SIP_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+        if (Capacitor.isNativePlatform()) {
+          const b64 = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
+          await Filesystem.writeFile({
+            path: fileName,
+            data: b64,
+            directory: Directory.Documents
+          });
+          alert(`Saved Excel successfully to Documents Folder!`);
+        } else {
+          XLSX.writeFile(workbook, fileName);
+        }
       } catch (err) {
         console.error("Export failed", err);
       }
@@ -80,7 +93,7 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
 
   const handleExportPDF = () => {
     setIsExportingPDF(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         // @ts-ignore
         const doc = new jsPDF();
@@ -113,12 +126,24 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
         doc.autoTable({
           startY: finalYExpenses + 20,
           head: [['Date', 'Category', 'Amount', 'Note']],
-          body: state.incomeSources.map(i => [i.date, i.category, i.amount, i.note || '']),
+          body: state.incomeSources.map(i => [i.date, i.type, i.amount, i.note || '']),
           theme: 'striped',
           headStyles: { fillColor: [16, 185, 129] }
         });
 
-        doc.save(`SIP_Report_${currentDate}.pdf`);
+        const fileName = `SIP_Report_${currentDate}.pdf`;
+        if (Capacitor.isNativePlatform()) {
+          const pdfOutput = doc.output('datauristring');
+          const base64Data = (pdfOutput as string).split(',')[1];
+          await Filesystem.writeFile({
+            path: fileName,
+            data: base64Data,
+            directory: Directory.Documents
+          });
+          alert(`Saved PDF successfully to Documents Folder!`);
+        } else {
+          doc.save(fileName);
+        }
       } catch (err) {
         console.error("PDF Export failed", err);
       }

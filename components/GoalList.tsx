@@ -38,7 +38,7 @@ export const GoalList: React.FC<GoalListProps> = ({ state, onAdd, onDelete }) =>
     <div className="space-y-4 pb-24">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold text-black">Future Goals</h2>
-        <button 
+        <button
           onClick={() => setShowAdd(!showAdd)}
           className="p-2 bg-blue-600 text-white rounded-full shadow-lg"
         >
@@ -50,20 +50,20 @@ export const GoalList: React.FC<GoalListProps> = ({ state, onAdd, onDelete }) =>
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm space-y-4 text-black">
           <div>
             <label className="block text-xs font-semibold opacity-60 mb-1">Goal Name</label>
-            <input 
-              type="text" 
-              value={name} 
-              onChange={(e) => setName(e.target.value)} 
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-black"
               placeholder="e.g. New Laptop, Vacation"
             />
           </div>
           <div>
             <label className="block text-xs font-semibold opacity-60 mb-1">Target Amount ({state.currency})</label>
-            <input 
-              type="number" 
-              value={targetAmount} 
-              onChange={(e) => setTargetAmount(e.target.value)} 
+            <input
+              type="number"
+              value={targetAmount}
+              onChange={(e) => setTargetAmount(e.target.value)}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-black"
               placeholder="0.00"
             />
@@ -71,8 +71,8 @@ export const GoalList: React.FC<GoalListProps> = ({ state, onAdd, onDelete }) =>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold opacity-60 mb-1">Category</label>
-              <select 
-                value={category} 
+              <select
+                value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-black"
               >
@@ -85,24 +85,24 @@ export const GoalList: React.FC<GoalListProps> = ({ state, onAdd, onDelete }) =>
             </div>
             <div>
               <label className="block text-xs font-semibold opacity-60 mb-1">Deadline (Optional)</label>
-              <input 
-                type="date" 
-                value={deadline} 
-                onChange={(e) => setDeadline(e.target.value)} 
+              <input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-black"
               />
             </div>
           </div>
           <div className="flex gap-3">
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => setShowAdd(false)}
               className="flex-1 p-3 bg-slate-100 text-black rounded-xl font-semibold"
             >
               Cancel
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-semibold shadow-lg shadow-blue-200"
             >
               Add Goal
@@ -141,20 +141,20 @@ export const GoalList: React.FC<GoalListProps> = ({ state, onAdd, onDelete }) =>
                     <Trash2 size={16} />
                   </button>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs font-semibold">
                     <span>{state.currency}{Math.round(goal.currentAmount).toLocaleString()}</span>
                     <span className="opacity-40">Target: {state.currency}{goal.targetAmount.toLocaleString()}</span>
                   </div>
-                  
+
                   <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                    <div 
+                    <div
                       className={`h-full transition-all duration-1000 ease-out ${isCompleted ? 'bg-green-500' : 'bg-blue-600'}`}
                       style={{ width: `${Math.min(100, progress)}%` }}
                     />
                   </div>
-                  
+
                   <div className="flex justify-between items-center text-[10px] pt-1">
                     <span className={`font-bold ${isCompleted ? 'text-green-600' : 'text-blue-600'}`}>
                       {Math.round(progress)}% Completed

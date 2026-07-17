@@ -1,9 +1,5 @@
-import { AppState, UserType, ProfileData } from "../types";
-import { Capacitor } from '@capacitor/core';
-const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://smart-income-planner.onrender.com' : '';
-import { Preferences } from '@capacitor/preferences';
+import { AppState, ProfileData } from "../types";
 
-// Fixed: changed state type to AppState & ProfileData to fix property access errors
 export const getSmartInvestmentInsights = async (state: AppState & ProfileData) => {
   const totalIncome = state.incomeSources.reduce((sum, i) => sum + i.amount, 0);
   const totalExpenses = state.expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -27,24 +23,24 @@ export const getSmartInvestmentInsights = async (state: AppState & ProfileData) 
   `;
 
   try {
-    const { value: token } = await Preferences.get({ key: 'token' });
-    const response = await fetch(`${API_BASE_URL}/api/insights`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ prompt }),
+    const rawApiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${rawApiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
     });
 
     if (!response.ok) {
-      throw new Error("Failed to fetch insights from backend");
+      throw new Error(`HTTP ${response.status}`);
     }
 
     const data = await response.json();
-    return data.result || "Could not generate insights at this time.";
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Could not generate insights at this time.";
   } catch (error) {
-    console.error("Backend Proxy Gemini Error:", error);
+    console.error("Native REST Gemini Error:", error);
     return "Error generating smart insights. Please try again later.";
   }
 };
