@@ -28,7 +28,7 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 
-const API_BASE_URL = Capacitor.isNativePlatform() ? 'http://127.0.0.1:3001' : '';
+const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://smart-income-planner.onrender.com' : '';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'income' | 'expenses' | 'goals' | 'insights' | 'settings'>('dashboard');

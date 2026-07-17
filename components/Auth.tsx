@@ -5,7 +5,7 @@ import { NotificationToast, ToastType } from './NotificationToast';
 import { Capacitor } from '@capacitor/core';
 
 const GOOGLE_CLIENT_ID = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID || 'dummy-client-id';
-const API_BASE_URL = Capacitor.isNativePlatform() ? 'http://127.0.0.1:3001' : '';
+const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://smart-income-planner.onrender.com' : '';
 
 interface AuthProps {
     onLogin: (token: string, user: any) => void;
