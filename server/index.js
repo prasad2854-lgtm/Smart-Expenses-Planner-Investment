@@ -228,12 +228,20 @@ app.post('/api/transactions/automated', authenticateToken, async (req, res) => {
             description: `[Auto] ${type.toUpperCase()}: ${source} - ${title}`,
         };
 
+        const activeProfile = stateData.userType || 'EMPLOYEE';
+
+        // Ensure profile tree exists
+        if (!stateData.profiles) stateData.profiles = {};
+        if (!stateData.profiles[activeProfile]) {
+            stateData.profiles[activeProfile] = { incomeSources: [], expenses: [], goals: [] };
+        }
+
         if (isCredit) {
-            if (!stateData.incomeSources) stateData.incomeSources = [];
-            stateData.incomeSources.unshift(newOperation);
+            if (!stateData.profiles[activeProfile].incomeSources) stateData.profiles[activeProfile].incomeSources = [];
+            stateData.profiles[activeProfile].incomeSources.unshift(newOperation);
         } else {
-            if (!stateData.expenses) stateData.expenses = [];
-            stateData.expenses.unshift(newOperation);
+            if (!stateData.profiles[activeProfile].expenses) stateData.profiles[activeProfile].expenses = [];
+            stateData.profiles[activeProfile].expenses.unshift(newOperation);
         }
 
         // Save state back to db
