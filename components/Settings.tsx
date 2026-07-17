@@ -20,7 +20,7 @@ interface SettingsProps {
 export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdateProfile, onSetHousing, onReset, onLogout }) => {
   const [isChangingHousing, setIsChangingHousing] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
-  const [isExportingPDF, setIsExportingPDF] = useState(false);
+
   // localSelection tracks what is currently highlighted in the "change" menu
   const [localSelection, setLocalSelection] = useState<boolean>(state.hasOwnHouse !== false);
   const [newRent, setNewRent] = useState(state.fixedRent?.toString() || '');
@@ -91,65 +91,7 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
     }, 500);
   };
 
-  const handleExportPDF = () => {
-    setIsExportingPDF(true);
-    setTimeout(async () => {
-      try {
-        // @ts-ignore
-        const doc = new jsPDF();
-        const currentDate = new Date().toISOString().split('T')[0];
 
-        doc.setFontSize(22);
-        doc.text("Smart Income Planner - Financial Report", 14, 22);
-
-        doc.setFontSize(11);
-        doc.text(`Generated on: ${currentDate}`, 14, 30);
-        doc.text(`Account Type: ${state.userType || 'Default'}`, 14, 36);
-
-        // Expenses
-        doc.setFontSize(14);
-        doc.text("Expense Ledger", 14, 50);
-        // @ts-ignore
-        doc.autoTable({
-          startY: 55,
-          head: [['Date', 'Category', 'Amount', 'Note', 'Cash']],
-          body: state.expenses.map(e => [e.date, e.category, e.amount, e.note || '', e.isCash ? 'Yes' : 'No']),
-          theme: 'striped',
-          headStyles: { fillColor: [59, 130, 246] }
-        });
-
-        // Income
-        // @ts-ignore
-        const finalYExpenses = doc.lastAutoTable.finalY || 55;
-        doc.text("Income Ledger", 14, finalYExpenses + 15);
-        // @ts-ignore
-        doc.autoTable({
-          startY: finalYExpenses + 20,
-          head: [['Date', 'Category', 'Amount', 'Note']],
-          body: state.incomeSources.map(i => [i.date, i.type, i.amount, i.note || '']),
-          theme: 'striped',
-          headStyles: { fillColor: [16, 185, 129] }
-        });
-
-        const fileName = `SIP_Report_${currentDate}.pdf`;
-        if (Capacitor.isNativePlatform()) {
-          const pdfOutput = doc.output('datauristring');
-          const base64Data = (pdfOutput as string).split(',')[1];
-          await Filesystem.writeFile({
-            path: fileName,
-            data: base64Data,
-            directory: Directory.Documents
-          });
-          alert(`Saved PDF successfully to Documents Folder!`);
-        } else {
-          doc.save(fileName);
-        }
-      } catch (err) {
-        console.error("PDF Export failed", err);
-      }
-      setIsExportingPDF(false);
-    }, 500);
-  };
 
   const handleAllocChange = (key: keyof AllocationPercentages, value: string) => {
     const numValue = Math.max(0, Math.min(100, parseInt(value) || 0));
@@ -353,20 +295,13 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
       </div>
 
       <div className="pt-10 space-y-4">
-        <div className="flex gap-4">
+        <div className="flex">
           <button
             onClick={handleExportExcel}
-            disabled={isExportingExcel || isExportingPDF}
-            className={`flex-1 p-4 bg-emerald-600 text-white font-bold text-sm rounded-[1.5rem] shadow-md flex items-center justify-center gap-2 active:scale-[0.98] transition-all hover:bg-emerald-700 ${isExportingExcel ? 'opacity-70 cursor-wait' : ''}`}
+            disabled={isExportingExcel}
+            className={`w-full p-4 bg-emerald-600 text-white font-bold text-sm rounded-[1.5rem] shadow-md flex items-center justify-center gap-2 active:scale-[0.98] transition-all hover:bg-emerald-700 ${isExportingExcel ? 'opacity-70 cursor-wait' : ''}`}
           >
-            <FileSpreadsheet size={18} strokeWidth={2.5} /> Excel
-          </button>
-          <button
-            onClick={handleExportPDF}
-            disabled={isExportingExcel || isExportingPDF}
-            className={`flex-1 p-4 bg-blue-600 text-white font-bold text-sm rounded-[1.5rem] shadow-md flex items-center justify-center gap-2 active:scale-[0.98] transition-all hover:bg-blue-700 ${isExportingPDF ? 'opacity-70 cursor-wait' : ''}`}
-          >
-            <FileText size={18} strokeWidth={2.5} /> PDF
+            <FileSpreadsheet size={18} strokeWidth={2.5} /> Export as Excel
           </button>
         </div>
         <button

@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 
-const source = 'C:\\Users\\sivak\\.gemini\\antigravity\\brain\\6760203c-9d8a-462d-bb5a-2722596e3298\\media__1784319626998.jpg';
+const source = 'C:\\Users\\sivak\\.gemini\\antigravity\\brain\\6760203c-9d8a-462d-bb5a-2722596e3298\\media__1784320820683.jpg';
 
 const sizes = {
     mdpi: 48,

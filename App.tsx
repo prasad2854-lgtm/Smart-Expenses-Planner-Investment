@@ -99,6 +99,9 @@ const App: React.FC = () => {
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
+          if (Capacitor.isNativePlatform()) {
+            await Preferences.set({ key: 'auth_token', value: token });
+          }
         } else {
           setToken(null);
           localStorage.removeItem('auth_token');
