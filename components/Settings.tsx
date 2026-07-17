@@ -29,7 +29,7 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
   const allocation = state.allocation || DEFAULT_ALLOCATION;
   const totalAlloc = Object.values(allocation).reduce((a, b) => (a as number) + (b as number), 0) as number;
 
-  const showHousingSettings = state.userType === UserType.EMPLOYEE || state.userType === UserType.STUDENT;
+  const showHousingSettings = state.userType === UserType.EMPLOYEE;
 
   // Sync local state when external state changes or when entering "change" mode
   useEffect(() => {

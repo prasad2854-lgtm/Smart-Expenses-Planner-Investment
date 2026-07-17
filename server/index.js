@@ -7,9 +7,13 @@ import { OAuth2Client } from 'google-auth-library';
 import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+import { GoogleGenAI } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_for_dev';
@@ -250,6 +254,23 @@ app.post('/api/transactions/automated', authenticateToken, async (req, res) => {
 
 // Make sure to delete the /api/state without auth
 
+const ai = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
+
+app.post('/api/insights', authenticateToken, async (req, res) => {
+    try {
+        if (!ai) return res.status(500).json({ error: "Server API Key is not configured correctly." });
+        const { prompt } = req.body;
+        if (!prompt) return res.status(400).json({ error: "Prompt is required." });
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: prompt,
+        });
+        res.json({ result: response.text });
+    } catch (error) {
+        console.error("AI Insights backend error:", error);
+        res.status(500).json({ error: error.message || "Failed to generate AI insights." });
+    }
+});
 // --- Serve React Static Frontend ---
 app.use(express.static(path.join(__dirname, '../dist')));
 

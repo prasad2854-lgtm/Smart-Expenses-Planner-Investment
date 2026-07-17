@@ -67,6 +67,23 @@ const App: React.FC = () => {
     onboarded: false
   });
   const [isInitializing, setIsInitializing] = useState(true);
+  const [pullDist, setPullDist] = useState(0);
+  const touchStartY = useRef(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) touchStartY.current = e.touches[0].clientY;
+  };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (window.scrollY === 0 && touchStartY.current > 0) {
+      const dist = e.touches[0].clientY - touchStartY.current;
+      if (dist > 0) setPullDist(dist * 0.4);
+    }
+  };
+  const handleTouchEnd = () => {
+    if (pullDist > 80) fetchState();
+    setPullDist(0);
+    touchStartY.current = 0;
+  };
 
   // Validate token on mount
   useEffect(() => {
@@ -360,7 +377,7 @@ const App: React.FC = () => {
             <p className="opacity-70 mb-12">Select your profile to begin.</p>
             <div className="space-y-4">
               {Object.values(UserType).map(type => (
-                <button key={type} onClick={() => { setTempProfile(type); if (type === UserType.BUSINESS) finishOnboarding(UserType.BUSINESS, true, 0); else setOnboardingStep(1); }} className="w-full p-5 bg-white border-2 border-slate-100 rounded-3xl font-bold flex justify-between items-center group shadow-sm active:scale-95 transition-all">
+                <button key={type} onClick={() => { setTempProfile(type); if (type !== UserType.EMPLOYEE) finishOnboarding(type, true, 0); else setOnboardingStep(1); }} className="w-full p-5 bg-white border-2 border-slate-100 rounded-3xl font-bold flex justify-between items-center group shadow-sm active:scale-95 transition-all">
                   {type} Profile <ChevronRight size={20} className="text-slate-300 group-hover:text-blue-600 transition-all" />
                 </button>
               ))}
@@ -401,16 +418,29 @@ const App: React.FC = () => {
       <header className="px-6 py-6 sticky top-0 bg-slate-50/80 backdrop-blur-md z-30 flex justify-between items-start">
         <div className="flex-1">
           <h1 className="text-2xl font-black text-slate-900 leading-none mb-1">
-            {activeTab === 'dashboard' ? 'Dashboard' : activeTab === 'income' ? 'Income' : activeTab === 'expenses' ? 'Spent' : activeTab === 'goals' ? 'Goals' : activeTab === 'insights' ? 'Analysis' : 'Account'}
+            {activeTab === 'dashboard' ? (user?.name || user?.email?.split('@')[0] || 'Dashboard') : activeTab === 'income' ? 'Income' : activeTab === 'expenses' ? 'Spent' : activeTab === 'goals' ? 'Goals' : activeTab === 'insights' ? 'Analysis' : 'Account'}
           </h1>
           <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
-            {state.userType ? `${state.userType} Account` : 'Welcome, ' + (user?.name || user?.email?.split('@')[0])} {state.userType && state.userType !== UserType.BUSINESS && `• ${activeProfile.hasOwnHouse ? 'Owned' : 'Rented'}`}
+            {state.userType ? `${state.userType} Account` : 'Welcome'} {state.userType && state.userType === UserType.EMPLOYEE && `• ${activeProfile.hasOwnHouse ? 'Owned' : 'Rented'}`}
           </p>
         </div>
 
       </header>
 
-      <main className="flex-1 px-6 no-scrollbar overflow-y-auto">
+      <main
+        className="flex-1 px-6 no-scrollbar overflow-y-auto relative"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div style={{ height: Math.min(pullDist, 100) }} className="w-full flex items-center justify-center overflow-hidden transition-all duration-75">
+          {pullDist > 20 && (
+            <div className={`text-slate-400 flex items-center gap-2 font-bold text-sm bg-slate-200/50 py-1.5 px-4 rounded-full transition-colors ${pullDist > 80 ? 'text-blue-500 bg-blue-100' : ''}`}>
+              <ArrowDownCircle size={16} className={`transition-transform duration-300 ${pullDist > 80 ? 'rotate-180' : ''}`} />
+              {pullDist > 80 ? 'Release to Sync' : 'Pull to Sync'}
+            </div>
+          )}
+        </div>
         {activeTab === 'dashboard' && (
           <div className="space-y-6 pb-6">
             <Dashboard state={activeState} onUpdate={(u) => setState(prev => ({ ...prev, ...u }))} onRefresh={fetchState} />

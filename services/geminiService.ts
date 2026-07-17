@@ -1,10 +1,7 @@
-
-import { GoogleGenAI } from "@google/genai";
-// Fixed imports: added ProfileData to access nested financial properties
 import { AppState, UserType, ProfileData } from "../types";
-
-// Always initialize with the named apiKey parameter from process.env.API_KEY directly
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { Capacitor } from '@capacitor/core';
+const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://smart-income-planner.onrender.com' : '';
+import { Preferences } from '@capacitor/preferences';
 
 // Fixed: changed state type to AppState & ProfileData to fix property access errors
 export const getSmartInvestmentInsights = async (state: AppState & ProfileData) => {
@@ -30,15 +27,24 @@ export const getSmartInvestmentInsights = async (state: AppState & ProfileData) 
   `;
 
   try {
-    // Correct usage of generateContent with model name and prompt
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
+    const { value: token } = await Preferences.get({ key: 'token' });
+    const response = await fetch(`${API_BASE_URL}/api/insights`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ prompt }),
     });
-    // Use the .text property directly to extract content
-    return response.text || "Could not generate insights at this time.";
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch insights from backend");
+    }
+
+    const data = await response.json();
+    return data.result || "Could not generate insights at this time.";
   } catch (error) {
-    console.error("Gemini Error:", error);
+    console.error("Backend Proxy Gemini Error:", error);
     return "Error generating smart insights. Please try again later.";
   }
 };

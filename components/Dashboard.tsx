@@ -84,17 +84,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onUpdate, onRefresh
 
   return (
     <div className="space-y-6 pb-24">
-      <div className="flex justify-end">
-
-        {onRefresh && (
-          <button
-            onClick={onRefresh}
-            className="flex-shrink-0 h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-blue-100 group"
-          >
-            <RotateCcw size={20} strokeWidth={2.5} className="group-active:-rotate-90 group-active:transition-transform group-active:duration-300" />
-          </button>
-        )}
-      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
