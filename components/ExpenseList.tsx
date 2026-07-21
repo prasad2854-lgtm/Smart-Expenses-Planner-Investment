@@ -1,7 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppState, Expense, ExpenseCategory, ProfileData, UserType } from '../types';
-import { Plus, Calendar, Receipt, Trash2, ChevronDown, Home, Tag } from 'lucide-react';
+import { Plus, Calendar, Receipt, Trash2, ChevronDown, Home, Tag, Camera as CameraIcon, Loader2, Sparkles } from 'lucide-react';
+import { parseReceiptFromImage } from '../services/geminiService';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { CATEGORY_COLORS, SUB_CATEGORIES } from '../constants';
 
 interface ExpenseListProps {
@@ -17,6 +19,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ state, onAdd, onDelete
   const [category, setCategory] = useState<ExpenseCategory>(ExpenseCategory.FOOD);
   const [subCategory, setSubCategory] = useState<string>('');
   const [note, setNote] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
 
   const isHomeOwner = !!state.hasOwnHouse;
 
@@ -52,7 +55,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ state, onAdd, onDelete
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount) return;
-    
+
     if (isHomeOwner && category === ExpenseCategory.RENT) return;
 
     onAdd({
@@ -66,6 +69,39 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ state, onAdd, onDelete
     setNote('');
     setDate(new Date().toISOString().split('T')[0]);
     setShowAdd(false);
+  };
+
+  const handleNativeScan = async () => {
+    try {
+      const image = await Camera.getPhoto({
+        quality: 80,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Prompt,
+        promptLabelHeader: 'Scan Receipt',
+        promptLabelPhoto: 'Import from Gallery',
+        promptLabelPicture: 'Take a Photo'
+      });
+
+      const base64String = image.base64String;
+      if (!base64String) return;
+
+      setIsScanning(true);
+      const mimeType = image.format ? `image/${image.format}` : 'image/jpeg';
+
+      const result = await parseReceiptFromImage(base64String, mimeType, state.currency);
+      if (result.amount) setAmount(result.amount.toString());
+      if (result.category && Object.values(ExpenseCategory).includes(result.category as ExpenseCategory)) {
+        setCategory(result.category as ExpenseCategory);
+      }
+      if (result.note) setNote(result.note);
+    } catch (err: any) {
+      if (err.message && err.message.includes('User cancelled')) return;
+      console.error(err);
+      alert(`Failed to scan receipt: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   const suggestions = SUB_CATEGORIES[category] || [];
@@ -82,7 +118,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ state, onAdd, onDelete
             </div>
           )}
         </div>
-        <button 
+        <button
           onClick={() => setShowAdd(!showAdd)}
           className="p-3 bg-red-600 text-white rounded-2xl shadow-lg active:scale-95 transition-transform"
         >
@@ -92,6 +128,15 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ state, onAdd, onDelete
 
       {showAdd && (
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl border border-red-100 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+
+          <div className="flex justify-between items-center bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+            <span className="text-xs font-bold text-blue-700 flex items-center gap-1"><Sparkles size={12} /> AI Fast Track</span>
+            <button type="button" onClick={handleNativeScan} disabled={isScanning} className={`text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-2 cursor-pointer transition-all ${isScanning ? 'bg-slate-200 text-slate-500' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-sm shadow-blue-200'}`}>
+              {isScanning ? <Loader2 size={14} className="animate-spin" /> : <CameraIcon size={14} />}
+              {isScanning ? 'Scanning...' : 'Scan Receipt'}
+            </button>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold opacity-60 mb-1 uppercase tracking-wider">Amount ({state.currency})</label>
@@ -107,9 +152,9 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ state, onAdd, onDelete
             <div>
               <label className="block text-xs font-semibold opacity-60 mb-1 uppercase tracking-wider">Category</label>
               <div className="relative">
-                <select 
-                  value={category} 
-                  onChange={(e) => setCategory(e.target.value as ExpenseCategory)} 
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 appearance-none font-semibold transition-all"
                   style={{ borderLeft: `4px solid ${CATEGORY_COLORS[category]}` }}
                 >
@@ -132,11 +177,10 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ state, onAdd, onDelete
                       key={sc}
                       type="button"
                       onClick={() => setSubCategory(sc)}
-                      className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border ${
-                        subCategory === sc 
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100' 
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border ${subCategory === sc
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100'
                         : 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100'
-                      }`}
+                        }`}
                     >
                       {sc}
                     </button>
@@ -144,11 +188,10 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ state, onAdd, onDelete
                   <button
                     type="button"
                     onClick={() => setSubCategory('')}
-                    className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border ${
-                      subCategory === '' 
-                      ? 'bg-slate-600 text-white border-slate-600' 
+                    className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border ${subCategory === ''
+                      ? 'bg-slate-600 text-white border-slate-600'
                       : 'bg-slate-50 text-slate-400 border-slate-100'
-                    }`}
+                      }`}
                   >
                     Custom
                   </button>
@@ -159,12 +202,12 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ state, onAdd, onDelete
 
           <div>
             <label className="block text-xs font-semibold opacity-60 mb-1 uppercase tracking-wider">Note (Optional)</label>
-            <input 
-              type="text" 
-              value={note} 
-              onChange={(e) => setNote(e.target.value)} 
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500" 
-              placeholder={subCategory ? `e.g. ${subCategory} details...` : "Describe this expense..."} 
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500"
+              placeholder={subCategory ? `e.g. ${subCategory} details...` : "Describe this expense..."}
             />
           </div>
 
@@ -184,33 +227,39 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ state, onAdd, onDelete
           </div>
         ) : (
           filteredExpenses.map(expense => (
-              <div key={expense.id} className={`bg-white p-4 rounded-2xl border flex justify-between items-center shadow-sm transition-all hover:shadow-md ${expense.isAutoGenerated ? 'border-blue-50 bg-blue-50/10' : 'border-slate-100'}`}>
-                <div className="flex items-center gap-4">
-                  <div className="w-1.5 h-10 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[expense.category] }}></div>
-                  <div>
-                    <h4 className="text-sm font-bold flex items-center gap-2">
-                      {expense.category}
-                      {expense.subCategory && (
-                        <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-black uppercase tracking-tight">
-                          {expense.subCategory}
-                        </span>
-                      )}
-                    </h4>
-                    <div className="flex items-center gap-1 text-[10px] opacity-40">
+            <div key={expense.id} className={`bg-white p-4 rounded-2xl border flex justify-between items-center shadow-sm transition-all hover:shadow-md ${expense.isAutoGenerated ? 'border-blue-50 bg-blue-50/10' : 'border-slate-100'}`}>
+              <div className="flex items-start gap-4 flex-1 mr-4">
+                <div className="w-1.5 h-10 rounded-full mt-1 shrink-0" style={{ backgroundColor: CATEGORY_COLORS[expense.category] }}></div>
+                <div className="flex flex-col">
+                  <h4 className="text-sm font-bold text-slate-800 leading-snug line-clamp-2">
+                    {expense.note ? expense.note : expense.category}
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                    <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-400">
                       <Calendar size={10} />
                       {new Date(expense.date).toLocaleDateString()}
-                      {expense.note && <span className="max-w-[120px] truncate ml-1">• {expense.note}</span>}
-                    </div>
+                    </span>
+                    {expense.note && (
+                      <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-black uppercase tracking-tight">
+                        {expense.category}
+                      </span>
+                    )}
+                    {expense.subCategory && (
+                      <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-black uppercase tracking-tight">
+                        {expense.subCategory}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-bold text-red-600">-{state.currency}{expense.amount.toLocaleString()}</span>
-                  <button onClick={() => onDelete(expense.id)} className="opacity-20 hover:opacity-100 p-2 transition-all hover:text-red-600">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
               </div>
-            ))
+              <div className="flex items-center gap-4 shrink-0">
+                <span className="text-sm font-bold text-red-600">-{state.currency}{expense.amount.toLocaleString()}</span>
+                <button onClick={() => onDelete(expense.id)} className="opacity-20 hover:opacity-100 p-2 transition-all hover:text-red-600">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))
         )}
       </div>
     </div>

@@ -105,7 +105,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
                     <div className="text-center mb-8">
                         <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-                            {isLogin ? 'Welcome Back' : 'Create Account'}
+                            {isLogin ? 'Smart Expenses Planner & Investment' : 'Create Account'}
                         </h2>
                         <p className="text-slate-400 mt-2 text-sm">
                             {isLogin ? 'Enter your details to access your dashboard' : 'Join us to manage your finances smartly'}
@@ -170,22 +170,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                         </button>
                     </form>
 
-                    <div className="mt-8 flex items-center">
-                        <div className="flex-1 border-t border-slate-700"></div>
-                        <span className="px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">or continue with</span>
-                        <div className="flex-1 border-t border-slate-700"></div>
-                    </div>
 
-                    <div className="mt-6 flex justify-center w-full [&>div]:w-full [&>div>div]:w-full overflow-hidden rounded-xl border border-slate-700/50 bg-white">
-                        <GoogleLogin
-                            onSuccess={handleGoogleSuccess}
-                            onError={() => showNotification("Google Login Failed", 'critical')}
-                            theme="outline"
-                            size="large"
-                            width="100%"
-                            text={isLogin ? 'signin_with' : 'signup_with'}
-                        />
-                    </div>
 
                     <p className="mt-8 text-center text-sm text-slate-400">
                         {isLogin ? "Don't have an account? " : "Already have an account? "}

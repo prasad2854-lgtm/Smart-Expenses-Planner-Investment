@@ -211,7 +211,7 @@ export const Insights: React.FC<InsightsProps> = ({ state }) => {
       </div>
 
       <div className="space-y-4">
-        <h3 className="text-sm font-bold opacity-50 uppercase tracking-wider flex items-center gap-2"><PieChartIcon size={16} /> Expense Breakdown</h3>
+        <h3 className="text-sm font-bold opacity-50 uppercase tracking-wider flex items-center gap-2"><PieChartIcon size={16} /> Expenses by Category</h3>
         <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm h-64">
           {categoryData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
@@ -223,6 +223,7 @@ export const Insights: React.FC<InsightsProps> = ({ state }) => {
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                   formatter={(value: number) => `${state.currency}${value.toLocaleString()}`}
                 />
+                <Legend iconType="circle" />
               </PieChart>
             </ResponsiveContainer>
           ) : <div className="h-full flex items-center justify-center italic text-slate-400">No expenses in this period</div>}

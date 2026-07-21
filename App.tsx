@@ -5,12 +5,10 @@ import { DEFAULT_ALLOCATION, TYPE_SPECIFIC_SUB_ALLOCATIONS } from './constants';
 import { Dashboard } from './components/Dashboard';
 import { IncomeList } from './components/IncomeList';
 import { ExpenseList } from './components/ExpenseList';
-import { GoalList } from './components/GoalList';
 import { Insights } from './components/Insights';
 import { Settings } from './components/Settings';
 import { NotificationToast, ToastType } from './components/NotificationToast';
-import { CashWallet } from './components/CashWallet';
-import { BudgetPlanner } from './components/BudgetPlanner';
+
 import { Auth } from './components/Auth';
 import {
   LayoutDashboard,
@@ -31,7 +29,7 @@ import { Preferences } from '@capacitor/preferences';
 const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://smart-income-planner.onrender.com' : '';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'income' | 'expenses' | 'goals' | 'insights' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'income' | 'expenses' | 'insights' | 'settings'>('dashboard');
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const [onboardingStep, setOnboardingStep] = useState<number>(0);
   const [tempProfile, setTempProfile] = useState<UserType | null>(null);
@@ -125,14 +123,44 @@ const App: React.FC = () => {
       });
       if (res.ok) {
         const parsed = await res.json();
-        Object.keys(parsed.profiles || {}).forEach(key => {
-          if (parsed.profiles[key].hasOwnHouse === undefined) {
-            parsed.profiles[key].hasOwnHouse = true;
-          }
-          if (!parsed.profiles[key].allocation) {
-            parsed.profiles[key].allocation = { ...DEFAULT_ALLOCATION };
-          }
+
+        // Ensure all top level fields exist
+        if (!parsed.profiles) parsed.profiles = {};
+
+        // Rescue backwards-compat miskeyed 'EMPLOYEE' profile to 'Employee'
+        if (parsed.profiles['EMPLOYEE'] && !parsed.profiles['Employee']) {
+          parsed.profiles['Employee'] = parsed.profiles['EMPLOYEE'];
+          delete parsed.profiles['EMPLOYEE'];
+        }
+
+        // Ensure every valid UserType has a correctly formed ProfileData
+        Object.values(UserType).forEach((type) => {
+          const loadedProfile = parsed.profiles[type] || {};
+          parsed.profiles[type] = {
+            ...createInitialProfile(),
+            ...loadedProfile,
+            allocation: loadedProfile.allocation || { ...DEFAULT_ALLOCATION },
+            hasOwnHouse: loadedProfile.hasOwnHouse !== undefined ? loadedProfile.hasOwnHouse : true,
+            expenses: loadedProfile.expenses || [],
+            incomeSources: loadedProfile.incomeSources || [],
+            goals: loadedProfile.goals || []
+          };
         });
+
+        // Also normalize the state-level objects if missing
+        parsed.onboarded = !!parsed.onboarded;
+        parsed.currency = parsed.currency || '₹';
+
+        // Handle case-mismatch from backend automated transactions (EMPLOYEE -> Employee)
+        if (parsed.userType) {
+          const matchedEnum = Object.values(UserType).find(
+            type => type.toUpperCase() === parsed.userType?.toUpperCase()
+          );
+          if (matchedEnum) {
+            parsed.userType = matchedEnum;
+          }
+        }
+
         setState(parsed);
       }
     } catch (err) {
@@ -419,7 +447,7 @@ const App: React.FC = () => {
       <header className="px-6 py-6 sticky top-0 bg-slate-50/80 backdrop-blur-md z-30 flex justify-between items-start">
         <div className="flex-1">
           <h1 className="text-2xl font-black text-slate-900 leading-none mb-1">
-            {activeTab === 'dashboard' ? (user?.name || user?.email?.split('@')[0] || 'Dashboard') : activeTab === 'income' ? 'Income' : activeTab === 'expenses' ? 'Spent' : activeTab === 'goals' ? 'Goals' : activeTab === 'insights' ? 'Analysis' : 'Account'}
+            {activeTab === 'dashboard' ? (user?.name || user?.email?.split('@')[0] || 'Dashboard') : activeTab === 'income' ? 'Income' : activeTab === 'expenses' ? 'Spent' : activeTab === 'insights' ? 'Analysis' : 'Account'}
           </h1>
           <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
             {state.userType ? `${state.userType} Account` : 'Welcome'} {state.userType && state.userType === UserType.EMPLOYEE && `• ${activeProfile.hasOwnHouse ? 'Owned' : 'Rented'}`}
@@ -444,14 +472,12 @@ const App: React.FC = () => {
         </div>
         {activeTab === 'dashboard' && (
           <div className="space-y-6 pb-6">
-            <Dashboard state={activeState} onUpdate={(u) => setState(prev => ({ ...prev, ...u }))} onRefresh={fetchState} />
-            <CashWallet profile={activeProfile} updateProfile={updateProfileData} />
-            <BudgetPlanner state={activeState} onUpdateCategoryBudget={(cat, amt) => updateProfileData({ categoryBudgets: { ...(activeProfile.categoryBudgets || {}), [cat]: amt } })} />
+            <Dashboard state={activeState} onUpdate={(u) => setState(prev => ({ ...prev, ...u }))} onRefresh={fetchState} onAddExpense={(e) => updateProfileData({ expenses: [{ ...e, id: Math.random().toString(36).substr(2, 9) }, ...activeProfile.expenses] })} />
+
           </div>
         )}
         {activeTab === 'income' && <IncomeList state={activeState} onAdd={addIncome} onDelete={(id) => updateProfileData({ incomeSources: activeProfile.incomeSources.filter(i => i.id !== id) })} />}
         {activeTab === 'expenses' && <ExpenseList state={activeState} onAdd={(e) => updateProfileData({ expenses: [{ ...e, id: Math.random().toString(36).substr(2, 9) }, ...activeProfile.expenses] })} onDelete={(id) => updateProfileData({ expenses: activeProfile.expenses.filter(e => e.id !== id) })} />}
-        {activeTab === 'goals' && <GoalList state={activeState} onAdd={(g) => updateProfileData({ goals: [{ ...g, id: Math.random().toString(36).substr(2, 9) }, ...activeProfile.goals] })} onDelete={(id) => updateProfileData({ goals: activeProfile.goals.filter(g => g.id !== id) })} />}
         {activeTab === 'insights' && <Insights state={activeState} />}
         {activeTab === 'settings' && (
           <Settings
@@ -501,7 +527,6 @@ const App: React.FC = () => {
           { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
           { id: 'income', icon: ArrowUpCircle, label: 'Income' },
           { id: 'expenses', icon: ArrowDownCircle, label: 'Spent' },
-          { id: 'goals', icon: Target, label: 'Goals' },
           { id: 'insights', icon: Lightbulb, label: 'Analysis' },
           { id: 'settings', icon: SettingsIcon, label: 'Account' }
         ].map(tab => (
