@@ -23,6 +23,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onUpdate, onRefresh
   const isHomeOwner = !!state.hasOwnHouse;
   const [isScanning, setIsScanning] = useState(false);
   const [isBalanceExpanded, setIsBalanceExpanded] = useState(false);
+  const [expandedCard, setExpandedCard] = useState<'income' | 'expenses' | null>(null);
 
   const handleNativeScan = async () => {
     if (!onAddExpense) return;
@@ -140,23 +141,62 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onUpdate, onRefresh
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+        <div
+          onClick={() => setExpandedCard(expandedCard === 'income' ? null : 'income')}
+          className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 cursor-pointer active:scale-95 transition-all hover:bg-slate-50"
+        >
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 bg-green-100 rounded-lg">
               <TrendingUp size={18} className="text-green-600" />
             </div>
-            <span className="text-xs font-medium text-black opacity-60">Income</span>
+            <span className="text-xs font-medium text-black opacity-60 flex-1">Income</span>
+            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{expandedCard === 'income' ? 'Close' : 'View'}</span>
           </div>
           <div className="text-xl font-bold text-black">{state.currency}{totalIncome.toLocaleString()}</div>
+
+          {expandedCard === 'income' && (
+            <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 animate-in slide-in-from-top-2 fade-in duration-300">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Recent 5</p>
+              {state.incomeSources.slice(-5).reverse().map((i) => (
+                <div key={i.id} className="flex justify-between items-center text-xs">
+                  <span className="text-slate-600 truncate mr-2" title={i.note || i.type}>{i.note || i.type}</span>
+                  <span className="font-bold text-green-600">+{state.currency}{i.amount.toLocaleString()}</span>
+                </div>
+              ))}
+              {state.incomeSources.length === 0 && (
+                <p className="text-xs text-slate-400 italic">No recent income.</p>
+              )}
+            </div>
+          )}
         </div>
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+
+        <div
+          onClick={() => setExpandedCard(expandedCard === 'expenses' ? null : 'expenses')}
+          className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 cursor-pointer active:scale-95 transition-all hover:bg-slate-50"
+        >
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 bg-red-100 rounded-lg">
               <TrendingDown size={18} className="text-red-600" />
             </div>
-            <span className="text-xs font-medium text-black opacity-60">Expenses</span>
+            <span className="text-xs font-medium text-black opacity-60 flex-1">Expenses</span>
+            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{expandedCard === 'expenses' ? 'Close' : 'View'}</span>
           </div>
           <div className="text-xl font-bold text-black">{state.currency}{totalExpenses.toLocaleString()}</div>
+
+          {expandedCard === 'expenses' && (
+            <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 animate-in slide-in-from-top-2 fade-in duration-300">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Recent 5</p>
+              {activeExpenses.slice(-5).reverse().map((e) => (
+                <div key={e.id} className="flex justify-between items-center text-xs">
+                  <span className="text-slate-600 truncate mr-2 capitalize" title={e.note || e.category}>{e.note || e.category}</span>
+                  <span className="font-bold text-red-600">-{state.currency}{e.amount.toLocaleString()}</span>
+                </div>
+              ))}
+              {activeExpenses.length === 0 && (
+                <p className="text-xs text-slate-400 italic">No recent expenses.</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
