@@ -6,7 +6,7 @@ import { USER_TYPE_INCOME_MAPPING } from '../constants';
 
 interface IncomeListProps {
   state: AppState & ProfileData;
-  onAdd: (source: Omit<IncomeSource, 'id'>, autoAllocate: boolean) => void;
+  onAdd: (source: Omit<IncomeSource, 'id'>) => void;
   onDelete: (id: string) => void;
 }
 
@@ -14,26 +14,25 @@ export const IncomeList: React.FC<IncomeListProps> = ({ state, onAdd, onDelete }
   const [showAdd, setShowAdd] = useState(false);
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  
+
   // Get the single source type tied to this specific profile
-  const sourceByProfile = state.userType 
-    ? USER_TYPE_INCOME_MAPPING[state.userType] 
+  const sourceByProfile = state.userType
+    ? USER_TYPE_INCOME_MAPPING[state.userType]
     : IncomeSourceType.OTHER;
 
   const [note, setNote] = useState('');
-  const [autoAllocate, setAutoAllocate] = useState(true);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount) return;
-    
+
     onAdd({
       amount: parseFloat(amount),
       type: sourceByProfile, // Strictly use the profile-related type
       note,
       date: new Date(date).toISOString()
-    }, autoAllocate);
-    
+    });
+
     setAmount('');
     setNote('');
     setDate(new Date().toISOString().split('T')[0]);
@@ -49,7 +48,7 @@ export const IncomeList: React.FC<IncomeListProps> = ({ state, onAdd, onDelete }
             {state.userType} Profile
           </p>
         </div>
-        <button 
+        <button
           onClick={() => setShowAdd(!showAdd)}
           className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg active:scale-95 transition-all hover:bg-blue-700"
         >
@@ -67,10 +66,10 @@ export const IncomeList: React.FC<IncomeListProps> = ({ state, onAdd, onDelete }
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold opacity-60 mb-1">Amount ({state.currency})</label>
-              <input 
-                type="number" 
-                value={amount} 
-                onChange={(e) => setAmount(e.target.value)} 
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
                 className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-black text-xl font-bold"
                 placeholder="0.00"
                 autoFocus
@@ -78,10 +77,10 @@ export const IncomeList: React.FC<IncomeListProps> = ({ state, onAdd, onDelete }
             </div>
             <div>
               <label className="block text-xs font-semibold opacity-60 mb-1">Date</label>
-              <input 
-                type="date" 
-                value={date} 
-                onChange={(e) => setDate(e.target.value)} 
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
                 className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-black font-bold"
               />
             </div>
@@ -102,44 +101,25 @@ export const IncomeList: React.FC<IncomeListProps> = ({ state, onAdd, onDelete }
 
           <div>
             <label className="block text-xs font-semibold opacity-60 mb-1">Note (Optional)</label>
-            <input 
-              type="text" 
-              value={note} 
-              onChange={(e) => setNote(e.target.value)} 
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
               className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-black"
               placeholder="E.g. Bonus, Monthly Dividend"
             />
           </div>
 
-          <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-            <input 
-              type="checkbox" 
-              id="autoAllocate"
-              checked={autoAllocate}
-              onChange={(e) => setAutoAllocate(e.target.checked)}
-              className="mt-1 w-5 h-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
-            />
-            <label htmlFor="autoAllocate" className="flex-1 text-xs font-semibold text-slate-700 cursor-pointer select-none">
-              <div className="flex items-center gap-2 text-blue-600 mb-0.5">
-                <Zap size={14} fill="currentColor" />
-                Auto-allocate Expenses
-              </div>
-              <p className="text-[10px] font-normal text-slate-400">
-                Automatically split this income based on your {state.userType} profile's allocation settings.
-              </p>
-            </label>
-          </div>
-
           <div className="flex gap-3 pt-2">
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => setShowAdd(false)}
               className="flex-1 p-4 bg-slate-100 text-black rounded-2xl font-bold active:bg-slate-200 transition-colors"
             >
               Cancel
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="flex-2 p-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:bg-blue-700 transition-all flex items-center justify-center gap-2"
             >
               <Plus size={18} />
@@ -174,8 +154,8 @@ export const IncomeList: React.FC<IncomeListProps> = ({ state, onAdd, onDelete }
               </div>
               <div className="flex items-center gap-4">
                 <span className="text-sm font-black text-green-600">+{state.currency}{source.amount.toLocaleString()}</span>
-                <button 
-                  onClick={() => onDelete(source.id)} 
+                <button
+                  onClick={() => onDelete(source.id)}
                   className="text-black opacity-10 hover:opacity-100 hover:text-red-500 p-2 transition-all"
                 >
                   <Trash2 size={18} />
@@ -185,6 +165,6 @@ export const IncomeList: React.FC<IncomeListProps> = ({ state, onAdd, onDelete }
           ))
         )}
       </div>
-    </div>
+    </div >
   );
 };

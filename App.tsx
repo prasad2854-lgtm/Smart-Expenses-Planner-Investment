@@ -1,13 +1,17 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { AppState, UserType, IncomeSource, Expense, ExpenseCategory, Goal, ProfileData } from './types';
+import { AppState, UserType, IncomeSource, Expense, ExpenseCategory, Goal, ProfileData, RecurringExpense } from './types';
 import { DEFAULT_ALLOCATION, TYPE_SPECIFIC_SUB_ALLOCATIONS } from './constants';
 import { Dashboard } from './components/Dashboard';
 import { IncomeList } from './components/IncomeList';
 import { ExpenseList } from './components/ExpenseList';
 import { Insights } from './components/Insights';
 import { Settings } from './components/Settings';
+import { RecurringSetup } from './components/RecurringSetup';
 import { NotificationToast, ToastType } from './components/NotificationToast';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { calculateHealthScore, processRoutineExpenses } from './utils/financeCalculations';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 import { Auth } from './components/Auth';
 import {
@@ -21,12 +25,12 @@ import {
   Home,
   ChevronRight,
   ArrowLeft,
-  Building2
+  Building2,
+  RotateCcw
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
-
-const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://smart-income-planner.onrender.com' : '';
+const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://sepi-six.vercel.app' : '';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'income' | 'expenses' | 'insights' | 'settings'>('dashboard');
@@ -49,9 +53,7 @@ const App: React.FC = () => {
     expenses: [],
     goals: [],
     allocation: { ...DEFAULT_ALLOCATION },
-    monthlyLimit: 0,
-    hasOwnHouse: true,
-    fixedRent: 0
+    monthlyLimit: 0
   });
 
   const [state, setState] = useState<AppState>({
@@ -64,10 +66,15 @@ const App: React.FC = () => {
     currency: '₹',
     onboarded: false
   });
+
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   const [isInitializing, setIsInitializing] = useState(true);
   const [pullDist, setPullDist] = useState(0);
   const touchStartY = useRef(0);
-
   const handleTouchStart = (e: React.TouchEvent) => {
     if (window.scrollY === 0) touchStartY.current = e.touches[0].clientY;
   };
@@ -140,7 +147,6 @@ const App: React.FC = () => {
             ...createInitialProfile(),
             ...loadedProfile,
             allocation: loadedProfile.allocation || { ...DEFAULT_ALLOCATION },
-            hasOwnHouse: loadedProfile.hasOwnHouse !== undefined ? loadedProfile.hasOwnHouse : true,
             expenses: loadedProfile.expenses || [],
             incomeSources: loadedProfile.incomeSources || [],
             goals: loadedProfile.goals || []
@@ -174,6 +180,84 @@ const App: React.FC = () => {
     if (isAuthChecking || !token) return;
     fetchState();
   }, [isAuthChecking, token, fetchState]);
+
+  // Routine Expenses Daemon Engine
+  useEffect(() => {
+    if (isInitializing || !state.onboarded || !state.userType) return;
+
+    const checkRoutineExpenses = () => {
+      const currentState = stateRef.current;
+      const userType = currentState.userType;
+      if (!userType) return;
+
+      const activeProfile = currentState.profiles[userType];
+      if (!activeProfile || !activeProfile.recurringExpenses) return;
+
+      const { generatedExpenses, updatedRecurring } = processRoutineExpenses(activeProfile);
+
+      if (generatedExpenses.length > 0) {
+        setState(prev => ({
+          ...prev,
+          profiles: {
+            ...prev.profiles,
+            [userType]: {
+              ...prev.profiles[userType],
+              expenses: [...generatedExpenses, ...prev.profiles[userType].expenses],
+              recurringExpenses: updatedRecurring
+            }
+          }
+        }));
+        showNotification(`${generatedExpenses.length} routine expense(s) auto-debited!`, "info");
+      }
+    };
+
+    // Check immediately on load/switch
+    checkRoutineExpenses();
+
+    // Setup real-time interval check every 5 seconds for instant feedback
+    const interval = setInterval(checkRoutineExpenses, 5000);
+    return () => clearInterval(interval);
+  }, [state.userType, state.onboarded, isInitializing]);
+
+  // Synchronize OS Daily Snapshot Notifications
+  useEffect(() => {
+    if (!state.onboarded || isInitializing || !state.userType || !Capacitor.isNativePlatform()) return;
+    const syncDailyDigest = async () => {
+      try {
+        const profile = state.profiles[state.userType!];
+        if (!profile) return;
+
+        await LocalNotifications.requestPermissions();
+
+        const totalIncome = state.incomeSources.reduce((sum, inc) => sum + inc.amount, 0);
+        const totalExpenses = profile.expenses.reduce((sum, exp) => sum + exp.amount, 0);
+        const balance = totalIncome - totalExpenses;
+        const health = calculateHealthScore(state);
+
+        const formatter = new Intl.NumberFormat('en-IN', { style: 'currency', currency: state.currency });
+
+        const pending = await LocalNotifications.getPending();
+        if (pending.notifications.length > 0) {
+          await LocalNotifications.cancel(pending);
+        }
+
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              title: "Daily Financial Snapshot",
+              body: `Good morning! Current Balance: ${formatter.format(balance)} | SEPI Health Score: ${health}/1000. Open the app to view today's insights!`,
+              id: 11,
+              schedule: { on: { hour: 9, minute: 0 } },
+              smallIcon: "ic_stat_icon_config_sample"
+            }
+          ]
+        });
+      } catch (err) {
+        console.warn("Local Notifications failed to bind gracefully. Device may not support OS scheduling:", err);
+      }
+    };
+    syncDailyDigest();
+  }, [state, isInitializing]);
 
   useEffect(() => {
     if (state.onboarded && !isInitializing && token) {
@@ -232,55 +316,7 @@ const App: React.FC = () => {
     });
   };
 
-  const setHousingStatus = (isHomeowner: boolean, rentAmount: number = 0) => {
-    const type = state.userType;
-    if (!type || type === UserType.BUSINESS) return;
 
-    const profile = state.profiles[type];
-    const wasHomeowner = profile.hasOwnHouse !== false;
-    const newAlloc = { ...profile.allocation };
-
-    // Case 1: Switching from Renter to Owner
-    if (isHomeowner && !wasHomeowner) {
-      const subAlloc = TYPE_SPECIFIC_SUB_ALLOCATIONS[type];
-      const rentWeight = subAlloc ? (subAlloc[ExpenseCategory.RENT] || 0) : 0;
-
-      if (rentWeight > 0) {
-        const shiftTotal = Math.round((newAlloc.essentials * rentWeight) / 100);
-        newAlloc.essentials = Math.max(0, newAlloc.essentials - shiftTotal);
-        newAlloc.savings += Math.floor(shiftTotal / 2);
-        newAlloc.goals += Math.ceil(shiftTotal / 2);
-      }
-
-      updateProfileData({
-        hasOwnHouse: true,
-        fixedRent: 0,
-        allocation: newAlloc,
-        expenses: profile.expenses.filter(e => e.category !== ExpenseCategory.RENT)
-      });
-      showNotification("Switched to Owned House status.", "info");
-    }
-    // Case 2: Switching from Owner to Renter
-    else if (!isHomeowner && wasHomeowner) {
-      newAlloc.essentials = Math.min(100, newAlloc.essentials + 10);
-      newAlloc.savings = Math.max(0, newAlloc.savings - 5);
-      newAlloc.goals = Math.max(0, newAlloc.goals - 5);
-
-      updateProfileData({
-        hasOwnHouse: false,
-        fixedRent: rentAmount,
-        allocation: newAlloc
-      });
-      showNotification("Switched to Rented House status.", "info");
-    }
-    // Case 3: Just updating rent amount while remaining a renter
-    else if (!isHomeowner && !wasHomeowner) {
-      updateProfileData({
-        fixedRent: rentAmount
-      });
-      showNotification("Monthly rent updated.", "info");
-    }
-  };
 
   const addIncome = (source: Omit<IncomeSource, 'id'>, autoAllocate: boolean = false) => {
     const type = state.userType;
@@ -296,30 +332,9 @@ const App: React.FC = () => {
     if (autoAllocate) {
       const essentialsTotal = (source.amount * profile.allocation.essentials) / 100;
       const subAllocations = { ...TYPE_SPECIFIC_SUB_ALLOCATIONS[type] };
-      const rentPortionPercent = subAllocations[ExpenseCategory.RENT] || 0;
 
       let remainingEssentials = essentialsTotal;
       let shiftedToGoals = 0;
-
-      if (profile.hasOwnHouse) {
-        if (rentPortionPercent > 0) {
-          shiftedToGoals = (essentialsTotal * rentPortionPercent) / 100;
-          remainingEssentials = essentialsTotal - shiftedToGoals;
-        }
-        delete subAllocations[ExpenseCategory.RENT];
-      } else if (profile.fixedRent && profile.fixedRent > 0) {
-        newExpenses.push({
-          id: Math.random().toString(36).substr(2, 9),
-          category: ExpenseCategory.RENT,
-          amount: profile.fixedRent,
-          date: source.date,
-          note: `Auto-allocated Monthly Rent`,
-          isAutoGenerated: true
-        });
-        remainingEssentials = Math.max(0, essentialsTotal - profile.fixedRent);
-        delete subAllocations[ExpenseCategory.RENT];
-      }
-
       const totalSubWeight = Object.values(subAllocations).reduce((a, b) => (a as number) + (b as number), 0) as number;
       Object.entries(subAllocations).forEach(([cat, weight]) => {
         const amt = totalSubWeight > 0 ? (remainingEssentials * (weight as number)) / totalSubWeight : 0;
@@ -353,7 +368,7 @@ const App: React.FC = () => {
     });
   };
 
-  const finishOnboarding = (profile: UserType, isHomeOwner: boolean, rentAmount: number) => {
+  const finishOnboarding = (profile: UserType, recurringExpenses: RecurringExpense[]) => {
     setState(prev => ({
       ...prev,
       userType: profile,
@@ -362,8 +377,8 @@ const App: React.FC = () => {
         ...prev.profiles,
         [profile]: {
           ...prev.profiles[profile],
-          hasOwnHouse: isHomeOwner,
-          fixedRent: rentAmount
+          recurringExpenses,
+          recurringSetupComplete: true
         }
       }
     }));
@@ -406,35 +421,23 @@ const App: React.FC = () => {
             <p className="opacity-70 mb-12">Select your profile to begin.</p>
             <div className="space-y-4">
               {Object.values(UserType).map(type => (
-                <button key={type} onClick={() => { setTempProfile(type); if (type !== UserType.EMPLOYEE) finishOnboarding(type, true, 0); else setOnboardingStep(1); }} className="w-full p-5 bg-white border-2 border-slate-100 rounded-3xl font-bold flex justify-between items-center group shadow-sm active:scale-95 transition-all">
+                <button key={type} onClick={() => { setTempProfile(type); setOnboardingStep(1); }} className="w-full p-5 bg-white border-2 border-slate-100 rounded-3xl font-bold flex justify-between items-center group shadow-sm active:scale-95 transition-all">
                   {type} Profile <ChevronRight size={20} className="text-slate-300 group-hover:text-blue-600 transition-all" />
                 </button>
               ))}
             </div>
           </div>
         )}
-        {onboardingStep === 1 && (
+
+        {onboardingStep === 1 && tempProfile && (
           <div className="w-full max-w-sm animate-in fade-in slide-in-from-right-4">
-            <button onClick={() => setOnboardingStep(0)} className="mb-8 p-2 text-slate-400 flex items-center gap-2 hover:text-slate-900 transition-colors"><ArrowLeft size={16} /> Back</button>
-            <h2 className="text-2xl font-bold mb-8 text-slate-900">Housing Status</h2>
-            <div className="grid grid-cols-1 gap-4">
-              <button onClick={() => finishOnboarding(tempProfile!, true, 0)} className="p-6 bg-white border-2 border-slate-100 rounded-3xl text-left flex items-center gap-4 group active:scale-95 transition-all hover:border-blue-500">
-                <div className="p-3 bg-green-100 text-green-600 rounded-xl"><CheckCircle2 size={24} /></div>
-                <div><span className="block font-bold">Owned House</span><span className="text-xs opacity-50">No monthly rent</span></div>
-              </button>
-              <button onClick={() => setOnboardingStep(2)} className="p-6 bg-white border-2 border-slate-100 rounded-3xl text-left flex items-center gap-4 group active:scale-95 transition-all hover:border-blue-500">
-                <div className="p-3 bg-blue-100 text-blue-600 rounded-xl"><Building2 size={24} /></div>
-                <div><span className="block font-bold">Rented House</span><span className="text-xs opacity-50">Monthly tracking</span></div>
-              </button>
+            <button onClick={() => setOnboardingStep(0)} className="mb-4 p-2 text-slate-400 flex items-center gap-2 hover:text-slate-900 transition-colors"><ArrowLeft size={16} /> Back</button>
+            <div className="bg-white rounded-[2rem] p-4 shadow-sm border border-slate-100 border-2">
+              <RecurringSetup
+                profileType={tempProfile}
+                onComplete={(expenses) => finishOnboarding(tempProfile, expenses)}
+              />
             </div>
-          </div>
-        )}
-        {onboardingStep === 2 && (
-          <div className="w-full max-w-sm animate-in fade-in slide-in-from-right-4">
-            <button onClick={() => setOnboardingStep(1)} className="mb-8 p-2 text-slate-400 flex items-center gap-2 hover:text-slate-900 transition-colors"><ArrowLeft size={16} /> Back</button>
-            <h2 className="text-2xl font-bold mb-10 text-slate-900">Monthly Rent</h2>
-            <input type="number" value={tempRent} onChange={(e) => setTempRent(e.target.value)} placeholder="0.00" className="w-full p-6 text-center text-3xl font-bold bg-white border-b-4 border-blue-500 outline-none text-slate-900" autoFocus />
-            <button onClick={() => finishOnboarding(tempProfile!, false, parseFloat(tempRent) || 0)} className="w-full p-5 bg-blue-600 text-white rounded-3xl font-bold mt-10 active:scale-95 transition-all shadow-xl shadow-blue-200">Confirm</button>
           </div>
         )}
       </div>
@@ -450,7 +453,7 @@ const App: React.FC = () => {
             {activeTab === 'dashboard' ? (user?.name || user?.email?.split('@')[0] || 'Dashboard') : activeTab === 'income' ? 'Income' : activeTab === 'expenses' ? 'Spent' : activeTab === 'insights' ? 'Analysis' : 'Account'}
           </h1>
           <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
-            {state.userType ? `${state.userType} Account` : 'Welcome'} {state.userType && state.userType === UserType.EMPLOYEE && `• ${activeProfile.hasOwnHouse ? 'Owned' : 'Rented'}`}
+            {state.userType ? `${state.userType} Account` : 'Welcome'}
           </p>
         </div>
 
@@ -470,56 +473,56 @@ const App: React.FC = () => {
             </div>
           )}
         </div>
-        {activeTab === 'dashboard' && (
-          <div className="space-y-6 pb-6">
-            <Dashboard state={activeState} onUpdate={(u) => setState(prev => ({ ...prev, ...u }))} onRefresh={fetchState} onAddExpense={(e) => updateProfileData({ expenses: [{ ...e, id: Math.random().toString(36).substr(2, 9) }, ...activeProfile.expenses] })} />
-
-          </div>
-        )}
-        {activeTab === 'income' && <IncomeList state={activeState} onAdd={addIncome} onDelete={(id) => updateProfileData({ incomeSources: activeProfile.incomeSources.filter(i => i.id !== id) })} />}
-        {activeTab === 'expenses' && <ExpenseList state={activeState} onAdd={(e) => updateProfileData({ expenses: [{ ...e, id: Math.random().toString(36).substr(2, 9) }, ...activeProfile.expenses] })} onDelete={(id) => updateProfileData({ expenses: activeProfile.expenses.filter(e => e.id !== id) })} />}
-        {activeTab === 'insights' && <Insights state={activeState} />}
-        {activeTab === 'settings' && (
-          <Settings
-            state={activeState}
-            onUpdate={(u) => setState(prev => ({ ...prev, ...u }))}
-            onUpdateProfile={updateProfileData}
-            onSetHousing={setHousingStatus}
-            onReset={async () => {
-              if (confirm("Are you incredibly sure you want to reset and permanently delete all your profiles?")) {
-                try {
-                  await fetch(`${API_BASE_URL}/api/state`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-                  alert('Profile reset successfully!');
-                  // Force local state to raw initial
-                  setState({
-                    userType: null,
-                    profiles: {
-                      [UserType.EMPLOYEE]: createInitialProfile(),
-                      [UserType.BUSINESS]: createInitialProfile(),
-                      [UserType.STUDENT]: createInitialProfile(),
-                    },
-                    currency: '₹',
-                    onboarded: false
-                  });
-                  setOnboardingStep(0);
-                  setActiveTab('dashboard');
-                } catch (err) {
-                  console.error(err);
-                  alert('Failed to reset profile.');
+        <div key={activeTab} className="animate-in fade-in zoom-in-95 duration-300 ease-out preserve-3d">
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6 pb-6">
+              <Dashboard state={activeState} onUpdate={(u) => setState(prev => ({ ...prev, ...u }))} onRefresh={fetchState} onAddExpense={(e) => updateProfileData({ expenses: [{ ...e, id: Math.random().toString(36).substr(2, 9) }, ...activeProfile.expenses] })} />
+            </div>
+          )}
+          {activeTab === 'income' && <IncomeList state={activeState} onAdd={addIncome} onDelete={(id) => updateProfileData({ incomeSources: activeProfile.incomeSources.filter(i => i.id !== id) })} />}
+          {activeTab === 'expenses' && <ExpenseList state={activeState} onAdd={(e) => updateProfileData({ expenses: [{ ...e, id: Math.random().toString(36).substr(2, 9) }, ...activeProfile.expenses] })} onDelete={(id) => updateProfileData({ expenses: activeProfile.expenses.filter(e => e.id !== id) })} />}
+          {activeTab === 'insights' && <Insights state={activeState} />}
+          {activeTab === 'settings' && (
+            <Settings
+              state={activeState}
+              onUpdate={(u) => setState(prev => ({ ...prev, ...u }))}
+              onUpdateProfile={updateProfileData}
+              onReset={async () => {
+                if (confirm("Are you incredibly sure you want to reset and permanently delete all your profiles?")) {
+                  try {
+                    await fetch(`${API_BASE_URL}/api/state`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                    alert('Profile reset successfully!');
+                    // Force local state to raw initial
+                    setState({
+                      userType: null,
+                      profiles: {
+                        [UserType.EMPLOYEE]: createInitialProfile(),
+                        [UserType.BUSINESS]: createInitialProfile(),
+                        [UserType.STUDENT]: createInitialProfile(),
+                      },
+                      currency: '₹',
+                      onboarded: false
+                    });
+                    setOnboardingStep(0);
+                    setActiveTab('dashboard');
+                  } catch (err) {
+                    console.error(err);
+                    alert('Failed to reset profile.');
+                  }
                 }
-              }
-            }}
-            onLogout={async () => {
-              localStorage.removeItem('auth_token');
-              if (Capacitor.isNativePlatform()) {
-                await Preferences.remove({ key: 'auth_token' });
-              }
-              setToken(null);
-              setUser(null);
-              setActiveTab('dashboard');
-            }}
-          />
-        )}
+              }}
+              onLogout={async () => {
+                localStorage.removeItem('auth_token');
+                if (Capacitor.isNativePlatform()) {
+                  await Preferences.remove({ key: 'auth_token' });
+                }
+                setToken(null);
+                setUser(null);
+                setActiveTab('dashboard');
+              }}
+            />
+          )}
+        </div>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-xl border-t border-slate-100 px-4 py-4 flex justify-between items-center z-40 shadow-2xl">

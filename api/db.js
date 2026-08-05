@@ -1,0 +1,55 @@
+import pkg from 'pg';
+const { Pool } = pkg;
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dns from 'dns';
+
+dns.setDefaultResultOrder('ipv4first');
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables from the root .env.local file
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = "postgresql://neondb_owner:npg_0sxYkXu2Htzn@ep-delicate-forest-aw8pvej4-pooler.c-12.us-east-1.aws.neon.tech/neondb?sslmode=require";
+}
+
+// Use the DATABASE_URL environment variable for the connection string
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.warn("WARNING: DATABASE_URL is not set in .env.local. Database connection will fail.");
+}
+
+export const pool = new Pool({
+  connectionString,
+  ssl: { rejectUnauthorized: false }
+});
+
+// Initialize database schema (Creates the app_states table if it doesn't exist)
+export const initDb = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(255) PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255),
+        google_id VARCHAR(255) UNIQUE,
+        name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS app_states (
+        id VARCHAR(255) PRIMARY KEY,
+        state_data JSONB NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("Database initialized successfully.");
+  } catch (err) {
+    console.error("Error initializing database:", err);
+  }
+};

@@ -83,3 +83,35 @@ export const USER_TYPE_SUGGESTIONS: Record<UserType, string[]> = {
   [UserType.BUSINESS]: ['Business Reinvestment', 'Fixed Deposits', 'Government Bonds', 'Commercial Real Estate'],
   [UserType.STUDENT]: ['Recurring Deposits', 'Index Funds', 'Skill Certifications', 'High-Yield Savings'],
 };
+
+export const PROFILE_ALLOWED_CATEGORIES: Record<UserType, ExpenseCategory[]> = {
+  [UserType.EMPLOYEE]: [
+    ExpenseCategory.RENT,
+    ExpenseCategory.FOOD,
+    ExpenseCategory.TRAVEL,
+    ExpenseCategory.UTILITIES,
+    ExpenseCategory.MEDICAL,
+    ExpenseCategory.ENTERTAINMENT,
+    ExpenseCategory.ATM_WITHDRAWAL,
+    ExpenseCategory.OTHER
+  ],
+  [UserType.BUSINESS]: [
+    ExpenseCategory.BUSINESS_COSTS,
+    ExpenseCategory.BUSINESS_RESERVATION,
+    ExpenseCategory.TAX_RESERVE,
+    ExpenseCategory.PROVISIONS,
+    ExpenseCategory.TRAVEL,
+    ExpenseCategory.UTILITIES,
+    ExpenseCategory.ATM_WITHDRAWAL,
+    ExpenseCategory.OTHER
+  ],
+  [UserType.STUDENT]: [
+    ExpenseCategory.EDUCATION,
+    ExpenseCategory.RENT,
+    ExpenseCategory.FOOD,
+    ExpenseCategory.TRAVEL,
+    ExpenseCategory.ENTERTAINMENT,
+    ExpenseCategory.ATM_WITHDRAWAL,
+    ExpenseCategory.OTHER
+  ]
+};

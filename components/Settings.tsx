@@ -1,45 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { AppState, UserType, AllocationPercentages, ProfileData } from '../types';
-import { Shield, ChevronRight, Sliders, Briefcase, TrendingUp, GraduationCap, Home, Building2, CheckCircle2, LogOut, RotateCcw, X, FileSpreadsheet, FileText } from 'lucide-react';
+import { AppState, UserType, AllocationPercentages, ProfileData, RecurringExpense } from '../types';
+import { Shield, ChevronRight, Sliders, Briefcase, TrendingUp, GraduationCap, Home, Building2, CheckCircle2, LogOut, RotateCcw, X, ArrowLeft, FileSpreadsheet, FileText, Target } from 'lucide-react';
 import { CURRENCIES, DEFAULT_ALLOCATION } from '../constants';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { RecurringSetup } from './RecurringSetup';
+import { GoalList } from './GoalList';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { calculateHealthScore } from '../utils/financeCalculations';
 
 interface SettingsProps {
   state: AppState & ProfileData;
   onUpdate: (updates: Partial<AppState>) => void;
   onUpdateProfile: (updates: Partial<ProfileData>) => void;
-  onSetHousing: (isHomeowner: boolean, rent?: number) => void;
   onReset: () => void;
   onLogout: () => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdateProfile, onSetHousing, onReset, onLogout }) => {
-  const [isChangingHousing, setIsChangingHousing] = useState(false);
+export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdateProfile, onReset, onLogout }) => {
   const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [showRoutinePage, setShowRoutinePage] = useState(false);
+  const [showGoalsPage, setShowGoalsPage] = useState(false);
 
-  // localSelection tracks what is currently highlighted in the "change" menu
-  const [localSelection, setLocalSelection] = useState<boolean>(state.hasOwnHouse !== false);
-  const [newRent, setNewRent] = useState(state.fixedRent?.toString() || '');
-
-  const isHomeowner = state.hasOwnHouse !== false;
   const currentCurrencyLabel = CURRENCIES.find(c => c.symbol === state.currency)?.label || state.currency;
 
   const allocation = state.allocation || DEFAULT_ALLOCATION;
   const totalAlloc = Object.values(allocation).reduce((a, b) => (a as number) + (b as number), 0) as number;
-
-  const showHousingSettings = state.userType === UserType.EMPLOYEE;
-
-  // Sync local state when external state changes or when entering "change" mode
-  useEffect(() => {
-    if (!isChangingHousing) {
-      setLocalSelection(isHomeowner);
-      setNewRent(state.fixedRent?.toString() || '');
-    }
-  }, [isHomeowner, state.fixedRent, isChangingHousing]);
 
   const handleExportExcel = () => {
     setIsExportingExcel(true);
@@ -106,17 +95,7 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
     }
   };
 
-  const confirmHousingChange = () => {
-    if (localSelection) {
-      onSetHousing(true);
-      setIsChangingHousing(false);
-    } else {
-      const rent = parseFloat(newRent) || 0;
-      if (rent <= 0 && !confirm("Save with 0 rent?")) return;
-      onSetHousing(false, rent);
-      setIsChangingHousing(false);
-    }
-  };
+
 
   const allocationKeys: (keyof AllocationPercentages)[] = [
     'essentials', 'savings', 'investments', 'emergency', 'goals'
@@ -142,94 +121,7 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
       </div>
 
       <div className="space-y-8 px-1">
-        {/* Housing Status - Fixed bug where user was unable to switch types */}
-        {showHousingSettings && (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
-              <Home size={12} strokeWidth={3} /> HOUSING STATUS
-            </h4>
 
-            <div className="p-5 bg-white border border-slate-100 rounded-[2.2rem] shadow-sm transition-all hover:border-blue-100">
-              {!isChangingHousing ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center text-white shadow-lg ${isHomeowner ? 'bg-[#00c08b] shadow-green-100 ring-4 ring-green-50' : 'bg-blue-600 shadow-blue-100 ring-4 ring-blue-50'}`}>
-                      {isHomeowner ? <Home size={28} strokeWidth={2.5} /> : <Building2 size={28} strokeWidth={2.5} />}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="font-bold text-slate-900 text-lg leading-none">{isHomeowner ? 'Owned House' : 'Rented House'}</span>
-                      <span className="text-[13px] text-slate-400 font-medium mt-1">
-                        {isHomeowner ? 'No monthly rent tracked' : `Fixed Rent: ${state.currency}${state.fixedRent?.toLocaleString() || 0}`}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setIsChangingHousing(true)}
-                    className="text-[14px] font-black text-blue-600 bg-[#eef2ff] px-8 py-3 rounded-full active:scale-90 transition-all shadow-sm hover:bg-blue-100"
-                  >
-                    Change
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4 animate-in fade-in zoom-in duration-200">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Select house type</span>
-                    <button onClick={() => setIsChangingHousing(false)} className="text-slate-300 hover:text-red-500 p-1"><X size={20} /></button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setLocalSelection(true)}
-                      className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${localSelection ? 'border-green-500 bg-green-50' : 'border-slate-100 bg-slate-50/50'}`}
-                    >
-                      <Home size={24} className={localSelection ? 'text-green-600' : 'text-slate-300'} />
-                      <span className={`text-xs font-bold ${localSelection ? 'text-green-700' : 'text-slate-400'}`}>Owned</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLocalSelection(false)}
-                      className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${!localSelection ? 'border-blue-500 bg-blue-50' : 'border-slate-100 bg-slate-50/50'}`}
-                    >
-                      <Building2 size={24} className={!localSelection ? 'text-blue-600' : 'text-slate-300'} />
-                      <span className={`text-xs font-bold ${!localSelection ? 'text-blue-700' : 'text-slate-400'}`}>Rented</span>
-                    </button>
-                  </div>
-
-                  {!localSelection && (
-                    <div className="mt-4 space-y-2 animate-in slide-in-from-top-1 duration-200">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Monthly Rent Amount</label>
-                      <input
-                        type="number"
-                        value={newRent}
-                        onChange={(e) => setNewRent(e.target.value)}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold focus:ring-2 focus:ring-blue-500/20"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  )}
-
-                  <div className="pt-2">
-                    <button
-                      onClick={confirmHousingChange}
-                      className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-sm shadow-lg shadow-blue-100 active:scale-[0.98] transition-all"
-                    >
-                      Save Changes
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {isHomeowner && !isChangingHousing && (
-              <div className="flex items-center gap-2 ml-3 mt-2 animate-in slide-in-from-left-2 duration-500">
-                <div className="w-5 h-5 bg-green-50 text-green-600 rounded-full flex items-center justify-center shadow-sm">
-                  <CheckCircle2 size={12} strokeWidth={3} />
-                </div>
-                <p className="text-[11px] text-[#00c08b] font-black tracking-tight uppercase tracking-wider">Rent allocation moved to savings & goals.</p>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Switch Profile Control */}
         <div className="space-y-4">
@@ -253,6 +145,43 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
                   })`
               }}
             />
+          </div>
+        </div>
+
+        {/* Routine Expenses Modal Trigger */}
+        <div className="space-y-4">
+          <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">AUTOMATION</h4>
+          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-4">
+            <button
+              onClick={() => setShowRoutinePage(true)}
+              className="w-full flex items-center justify-between p-2 active:scale-95 transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-[#eef2ff] text-blue-600 rounded-[1.2rem] flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <RotateCcw size={24} />
+                </div>
+                <div className="text-left flex-1">
+                  <span className="block font-bold text-slate-900 border-none outline-none text-lg">Routine Expenses</span>
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-older">{state.recurringExpenses ? state.recurringExpenses.length : 0} active routines</span>
+                </div>
+              </div>
+              <ChevronRight size={20} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
+            </button>
+            <button
+              onClick={() => setShowGoalsPage(true)}
+              className="w-full flex items-center justify-between p-2 mt-2 active:scale-95 transition-all group border-t border-slate-100 pt-3"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-[#fff0f5] text-pink-600 rounded-[1.2rem] flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Target size={24} />
+                </div>
+                <div className="text-left flex-1">
+                  <span className="block font-bold text-slate-900 border-none outline-none text-lg">Financial Goals</span>
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-older">{state.goals ? state.goals.length : 0} active goals</span>
+                </div>
+              </div>
+              <ChevronRight size={20} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
+            </button>
           </div>
         </div>
 
@@ -317,6 +246,49 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
           <X size={18} strokeWidth={3} /> Clear Data
         </button>
       </div>
+
+      {/* Full-Screen Routine Page Overlay */}
+      {showRoutinePage && (
+        <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col animate-in slide-in-from-right-4 duration-300">
+          <div className="bg-white px-4 py-4 flex items-center justify-between shadow-sm border-b border-slate-100 shrink-0">
+            <button onClick={() => setShowRoutinePage(false)} className="p-3 bg-slate-100 rounded-2xl active:scale-95 transition-transform text-slate-600">
+              <ArrowLeft size={24} />
+            </button>
+            <h2 className="font-bold text-lg text-slate-800">Routine Expenses</h2>
+            <div className="w-12"></div> {/* Spacer for alignment */}
+          </div>
+          <div className="flex-1 overflow-y-auto pb-8">
+            <RecurringSetup
+              profileType={state.userType || UserType.EMPLOYEE}
+              initialExpenses={state.recurringExpenses}
+              onComplete={(expenses) => {
+                onUpdateProfile({ recurringExpenses: expenses, recurringSetupComplete: true });
+                setShowRoutinePage(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Full-Screen Goals Page Overlay */}
+      {showGoalsPage && (
+        <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col animate-in slide-in-from-right-4 duration-300">
+          <div className="bg-white px-4 py-4 flex items-center justify-between shadow-sm border-b border-slate-100 shrink-0">
+            <button onClick={() => setShowGoalsPage(false)} className="p-3 bg-slate-100 rounded-2xl active:scale-95 transition-transform text-slate-600">
+              <ArrowLeft size={24} />
+            </button>
+            <h2 className="font-bold text-lg text-slate-800">Financial Goals</h2>
+            <div className="w-12"></div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 pb-8">
+            <GoalList
+              state={state}
+              onAdd={(g) => onUpdateProfile({ goals: [...(state.goals || []), { ...g, id: Date.now().toString() }] })}
+              onDelete={(id) => onUpdateProfile({ goals: (state.goals || []).filter(g => g.id !== id) })}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

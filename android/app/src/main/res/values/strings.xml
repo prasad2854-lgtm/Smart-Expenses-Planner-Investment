@@ -4,4 +4,5 @@
     <string name="title_activity_main">Smart Expenses Planner &amp; Investment</string>
     <string name="package_name">com.smartincomeplanner.app</string>
     <string name="custom_url_scheme">com.smartincomeplanner.app</string>
+    <string name="server_client_id">257425560798-5ltn6vsrj4l5dl59t86j1sun05p6f6rf.apps.googleusercontent.com</string>
 </resources>

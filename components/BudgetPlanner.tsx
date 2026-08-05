@@ -1,5 +1,6 @@
 import React from 'react';
-import { AppState, ExpenseCategory } from '../types';
+import { AppState, ExpenseCategory, UserType } from '../types';
+import { PROFILE_ALLOWED_CATEGORIES } from '../constants';
 
 interface BudgetPlannerProps {
     state: AppState;
@@ -23,7 +24,7 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({ state, onUpdateCat
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
                 <h2 className="text-xl font-bold text-slate-900 mb-4">Categorical Budgets</h2>
 
-                {Object.values(ExpenseCategory).map(category => {
+                {PROFILE_ALLOWED_CATEGORIES[state.userType || UserType.EMPLOYEE].map(category => {
                     const budget = budgets[category] || 0;
                     const spent = expensesByCategory[category] || 0;
                     const percentage = budget > 0 ? (spent / budget) * 100 : 0;
