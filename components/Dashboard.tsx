@@ -10,6 +10,7 @@ import { CATEGORY_COLORS } from '../constants';
 import { TrendingUp, TrendingDown, Landmark, ShieldCheck, Calculator, LineChart as ChartIcon, RotateCcw, Camera as CameraIcon, Loader2, Sparkles } from 'lucide-react';
 import { parseReceiptFromImage } from '../services/geminiService';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { calculateHealthScore, detectLifestyleInflation } from '../utils/financeCalculations';
 
 interface DashboardProps {
   state: AppState & ProfileData;
@@ -73,6 +74,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onUpdate, onRefresh
   const totalExpenses = activeExpenses.reduce((sum, e) => sum + e.amount, 0);
   const balance = totalIncome - totalExpenses;
 
+  const healthScoreRaw = calculateHealthScore(state);
+  const healthScore = healthScoreRaw;
+  const hasInflation = detectLifestyleInflation(activeExpenses);
 
   const growthData = useMemo(() => {
     const dataMap: Record<string, { income: number; expense: number }> = {};
@@ -172,6 +176,68 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onUpdate, onRefresh
         </div>
         <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-blue-500 rounded-full opacity-30 blur-2xl"></div>
       </div>
+
+      {hasInflation && (
+        <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 flex items-start gap-3">
+          <div className="bg-amber-100 p-2 rounded-xl text-amber-600 mt-1">
+            <TrendingUp size={20} />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-amber-800">Lifestyle Inflation Alert</h4>
+            <p className="text-xs text-amber-600 mt-1">
+              Your recurring and luxury spending has trended actively upward over the past two months. Consider reviewing auto-subscriptions to maintain your saving rate.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic Health Score */}
+      {(() => {
+        const savedPercent = totalIncome > 0 ? Math.round(Math.max(0, ((totalIncome - totalExpenses) / totalIncome) * 100)) : 0;
+
+        let scoreState = { color: 'bg-green-500', bg: 'bg-green-50', border: 'border-green-100', text: 'text-green-700', label: 'Excellent' };
+        if (healthScore < 400) scoreState = { color: 'bg-red-500', bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-700', label: 'At Risk' };
+        else if (healthScore < 600) scoreState = { color: 'bg-amber-500', bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-700', label: 'Needs Attention' };
+        else if (healthScore < 800) scoreState = { color: 'bg-blue-500', bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-700', label: 'Good' };
+
+        const activeBars = Math.max(1, Math.min(5, Math.ceil((healthScore / 1000) * 5)));
+
+        return (
+          <div className={`p-5 rounded-3xl border ${scoreState.bg} ${scoreState.border}`}>
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className={`text-sm font-bold uppercase tracking-wider ${scoreState.text}`}>Financial Health</h3>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className={`text-3xl font-black ${scoreState.text}`}>{healthScoreRaw}</span>
+                  <span className={`text-sm font-medium ${scoreState.text} opacity-70`}>/ 1000</span>
+                </div>
+              </div>
+              <div className={`px-3 py-1 rounded-full text-xs font-bold ${scoreState.color} text-white shadow-sm`}>
+                {scoreState.label}
+              </div>
+            </div>
+
+            <div className="flex gap-1 mb-4 h-2 w-full">
+              {[1, 2, 3, 4, 5].map(bar => (
+                <div
+                  key={bar}
+                  className={`flex-1 rounded-full ${bar <= activeBars ? scoreState.color : 'bg-black/5'} transition-all duration-700`}
+                />
+              ))}
+            </div>
+
+            <p className="text-xs font-medium text-slate-600">
+              {healthScore > 800
+                ? 'Income comfortably covers spending.'
+                : healthScore >= 500 && totalExpenses === 0
+                  ? 'Add your first income or expense.'
+                  : healthScore >= 500
+                    ? 'Good, but monitor your spending.'
+                    : 'Warning: High expenditure rate or heavy deficit.'}
+            </p>
+          </div>
+        );
+      })()}
 
       {
         state.userType !== UserType.BUSINESS && (
