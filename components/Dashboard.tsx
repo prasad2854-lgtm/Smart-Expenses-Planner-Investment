@@ -22,6 +22,7 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ state, onUpdate, onRefresh, onAddExpense }) => {
   const isHomeOwner = !!state.hasOwnHouse;
   const [isScanning, setIsScanning] = useState(false);
+  const [isBalanceExpanded, setIsBalanceExpanded] = useState(false);
 
   const handleNativeScan = async () => {
     if (!onAddExpense) return;
@@ -159,10 +160,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onUpdate, onRefresh
         </div>
       </div>
 
-      <div className="bg-blue-600 p-6 rounded-3xl shadow-lg text-white relative overflow-hidden">
+      <div
+        onClick={() => setIsBalanceExpanded(!isBalanceExpanded)}
+        className="bg-blue-600 p-6 rounded-3xl shadow-lg text-white relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform duration-300 select-none hover:shadow-blue-600/30"
+      >
         <div className="relative z-10">
-          <p className="text-blue-100 text-sm font-medium">Available Balance</p>
-          <h2 className="text-3xl font-bold mb-4">{state.currency}{balance.toLocaleString()}</h2>
+          <p className="text-blue-100 text-sm font-medium flex items-center justify-between">
+            Available Balance
+            <span className="text-xs bg-blue-500/50 px-2 py-1 rounded-full">{isBalanceExpanded ? 'Hide Details' : 'Tap for Details'}</span>
+          </p>
+          <h2 className="text-3xl font-bold mb-4 mt-2">{state.currency}{balance.toLocaleString()}</h2>
           <div className="flex justify-between items-end">
             <div>
               <p className="text-xs text-blue-100 opacity-80">Suggested Savings</p>
@@ -173,8 +180,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onUpdate, onRefresh
               <p className="font-semibold text-lg">{state.currency}{((totalIncome * state.allocation.investments) / 100).toLocaleString()}</p>
             </div>
           </div>
+
+          {isBalanceExpanded && (
+            <div className="mt-6 pt-4 border-t border-blue-500/50 space-y-3 animate-in slide-in-from-top-4 fade-in duration-300">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-blue-200">Total Income</span>
+                <span className="font-medium text-green-300">+{state.currency}{totalIncome.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-blue-200">Total Expenses</span>
+                <span className="font-medium text-red-300">-{state.currency}{totalExpenses.toLocaleString()}</span>
+              </div>
+
+              <div className="pt-2">
+                <p className="text-[10px] text-blue-300 uppercase tracking-wider mb-2 font-bold">Full Budget Mapping</p>
+                <div className="space-y-1">
+                  {Object.entries(state.allocation).map(([key, value]) => {
+                    // Exclude savings and investments as they are explicitly shown above
+                    if (key === 'savings' || key === 'investments') return null;
+                    return (
+                      <div key={key} className="flex justify-between items-center text-xs">
+                        <span className="text-blue-100 capitalize">{key}</span>
+                        <span className="font-medium">{state.currency}{((totalIncome * (value as number)) / 100).toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+          )}
         </div>
-        <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-blue-500 rounded-full opacity-30 blur-2xl"></div>
+        <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-blue-500 rounded-full opacity-30 blur-2xl pointer-events-none"></div>
       </div>
 
       {hasInflation && (
