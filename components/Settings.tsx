@@ -216,9 +216,16 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
               </div>
               <ChevronRight size={20} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
             </button>
+          </div>
+        </div>
+
+        {/* Security & Devices Trigger */}
+        <div className="space-y-4">
+          <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">SECURITY & ACCESS</h4>
+          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-4">
             <button
               onClick={() => { setShowDevicesPage(true); fetchActiveSessions(); }}
-              className="w-full flex items-center justify-between p-2 mt-2 active:scale-95 transition-all group border-t border-slate-100 pt-3"
+              className="w-full flex items-center justify-between p-2 active:scale-95 transition-all group"
             >
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-[1.2rem] flex items-center justify-center group-hover:scale-110 transition-transform">
