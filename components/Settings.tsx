@@ -12,7 +12,7 @@ import { GoalList } from './GoalList';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { calculateHealthScore } from '../utils/financeCalculations';
 
-const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://sepi-restored.vercel.app' : '';
+const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://sepi-ai.vercel.app' : '';
 
 interface SettingsProps {
   state: AppState & ProfileData;

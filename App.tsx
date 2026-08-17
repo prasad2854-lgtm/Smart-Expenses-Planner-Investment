@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
-const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://sepi-restored.vercel.app' : '';
+const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://sepi-ai.vercel.app' : '';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'income' | 'expenses' | 'insights' | 'settings'>('dashboard');
