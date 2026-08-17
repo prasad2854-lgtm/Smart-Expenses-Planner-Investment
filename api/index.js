@@ -70,8 +70,17 @@ app.post('/api/auth/register', async (req, res) => {
         );
 
         const user = result.rows[0];
-        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
+        const sessionId = crypto.randomUUID();
+        const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
+        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown IP';
+
+        await pool.query(
+            'INSERT INTO device_sessions (session_id, user_id, device_info, ip_address) VALUES ($1, $2, $3, $4)',
+            [sessionId, user.id, deviceInfo, ipAddress]
+        );
+
+        const token = jwt.sign({ id: user.id, email: user.email, sessionId: sessionId }, JWT_SECRET, { expiresIn: '7d' });
         res.json({ user, token });
     } catch (err) {
         console.error("Registration error:", err);
@@ -99,7 +108,16 @@ app.post('/api/auth/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+        const sessionId = crypto.randomUUID();
+        const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
+        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown IP';
+
+        await pool.query(
+            'INSERT INTO device_sessions (session_id, user_id, device_info, ip_address) VALUES ($1, $2, $3, $4)',
+            [sessionId, user.id, deviceInfo, ipAddress]
+        );
+
+        const token = jwt.sign({ id: user.id, email: user.email, sessionId: sessionId }, JWT_SECRET, { expiresIn: '7d' });
         res.json({ user: { id: user.id, email: user.email, name: user.name }, token });
     } catch (err) {
         console.error("Login error:", err);
@@ -137,7 +155,16 @@ app.post('/api/auth/google', async (req, res) => {
             }
         }
 
-        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+        const sessionId = crypto.randomUUID();
+        const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
+        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown IP';
+
+        await pool.query(
+            'INSERT INTO device_sessions (session_id, user_id, device_info, ip_address) VALUES ($1, $2, $3, $4)',
+            [sessionId, user.id, deviceInfo, ipAddress]
+        );
+
+        const token = jwt.sign({ id: user.id, email: user.email, sessionId: sessionId }, JWT_SECRET, { expiresIn: '7d' });
         res.json({ user: { id: user.id, email: user.email, name: user.name }, token });
     } catch (err) {
         console.error("Google verify error:", err);
@@ -147,12 +174,40 @@ app.post('/api/auth/google', async (req, res) => {
 
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
     try {
+        if (req.user.sessionId) {
+            await pool.query('UPDATE device_sessions SET last_active = CURRENT_TIMESTAMP WHERE session_id = $1', [req.user.sessionId]);
+        }
         const result = await pool.query('SELECT id, email, name, created_at FROM users WHERE id = $1', [req.user.id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-        res.json({ user: result.rows[0] });
+        res.json({ user: result.rows[0], currentSessionId: req.user.sessionId });
     } catch (err) {
         console.error("Fetch user error:", err);
         res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.get('/api/auth/sessions', authenticateToken, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT session_id, device_info, ip_address, last_active, created_at FROM device_sessions WHERE user_id = $1 ORDER BY last_active DESC', [req.user.id]);
+        res.json({ sessions: result.rows, currentSessionId: req.user.sessionId });
+    } catch (err) {
+        console.error("Error fetching sessions:", err);
+        res.status(500).json({ error: 'Server error fetching sessions' });
+    }
+});
+
+app.delete('/api/auth/sessions/:sessionId', authenticateToken, async (req, res) => {
+    try {
+        const targetSessionId = req.params.sessionId;
+        if (targetSessionId === 'all') {
+            await pool.query('DELETE FROM device_sessions WHERE user_id = $1 AND session_id != $2', [req.user.id, req.user.sessionId]);
+            return res.json({ success: true, message: 'All other sessions terminated' });
+        }
+        await pool.query('DELETE FROM device_sessions WHERE session_id = $1 AND user_id = $2', [targetSessionId, req.user.id]);
+        res.json({ success: true, message: 'Session terminated successfully' });
+    } catch (err) {
+        console.error("Error terminating session:", err);
+        res.status(500).json({ error: 'Server error terminating session' });
     }
 });
 

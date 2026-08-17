@@ -12,6 +12,8 @@ import { GoalList } from './GoalList';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { calculateHealthScore } from '../utils/financeCalculations';
 
+const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://sepi-restored.vercel.app' : '';
+
 interface SettingsProps {
   state: AppState & ProfileData;
   onUpdate: (updates: Partial<AppState>) => void;
@@ -24,11 +26,43 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [showRoutinePage, setShowRoutinePage] = useState(false);
   const [showGoalsPage, setShowGoalsPage] = useState(false);
+  const [showDevicesPage, setShowDevicesPage] = useState(false);
+  const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string>('');
+  const [isFetchingSessions, setIsFetchingSessions] = useState(false);
 
   const currentCurrencyLabel = CURRENCIES.find(c => c.symbol === state.currency)?.label || state.currency;
 
   const allocation = state.allocation || DEFAULT_ALLOCATION;
   const totalAlloc = Object.values(allocation).reduce((a, b) => (a as number) + (b as number), 0) as number;
+
+  const fetchActiveSessions = async () => {
+    setIsFetchingSessions(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${API_BASE_URL}/api/auth/sessions`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setActiveSessions(data.sessions || []);
+        setCurrentSessionId(data.currentSessionId || '');
+      }
+    } catch (e) { }
+    setIsFetchingSessions(false);
+  };
+
+  const handleRevokeSession = async (targetId: string) => {
+    if (!confirm("Are you sure you want to revoke this session?")) return;
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${API_BASE_URL}/api/auth/sessions/${targetId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) await fetchActiveSessions();
+    } catch (e) { }
+  };
 
   const handleExportExcel = () => {
     setIsExportingExcel(true);
@@ -182,6 +216,21 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
               </div>
               <ChevronRight size={20} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
             </button>
+            <button
+              onClick={() => { setShowDevicesPage(true); fetchActiveSessions(); }}
+              className="w-full flex items-center justify-between p-2 mt-2 active:scale-95 transition-all group border-t border-slate-100 pt-3"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-[1.2rem] flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Shield size={24} />
+                </div>
+                <div className="text-left flex-1">
+                  <span className="block font-bold text-slate-900 border-none outline-none text-lg">Active Devices</span>
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-older">Manage login sessions</span>
+                </div>
+              </div>
+              <ChevronRight size={20} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
+            </button>
           </div>
         </div>
 
@@ -286,6 +335,63 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
               onAdd={(g) => onUpdateProfile({ goals: [...(state.goals || []), { ...g, id: Date.now().toString() }] })}
               onDelete={(id) => onUpdateProfile({ goals: (state.goals || []).filter(g => g.id !== id) })}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Full-Screen Active Devices Overlay */}
+      {showDevicesPage && (
+        <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto animate-in slide-in-from-bottom duration-300">
+          <div className="max-w-md mx-auto min-h-screen bg-slate-50 pb-20">
+            <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-5 flex items-center gap-4 z-10 shadow-sm">
+              <button
+                onClick={() => setShowDevicesPage(false)}
+                className="p-2 -ml-2 rounded-full hover:bg-slate-100 active:bg-slate-200 transition-colors"
+              >
+                <ArrowLeft size={24} className="text-slate-700" />
+              </button>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 leading-tight">Active Sessions</h2>
+                <p className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">Device Management</p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {isFetchingSessions ? (
+                <div className="text-center p-10 text-slate-400 font-bold text-sm">Loading telemetry...</div>
+              ) : (
+                <>
+                  {activeSessions.length > 1 && (
+                    <button
+                      onClick={() => handleRevokeSession('all')}
+                      className="w-full text-center py-2 px-4 bg-red-50 text-red-600 rounded-xl font-bold text-sm mb-2 hover:bg-red-100 active:scale-95 transition-all"
+                    >
+                      Revoke All Unknown Devices
+                    </button>
+                  )}
+                  {activeSessions.map((s, idx) => {
+                    const isCurrent = s.session_id === currentSessionId;
+                    return (
+                      <div key={idx} className={`p-4 rounded-2xl border ${isCurrent ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100'}`}>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-sm">{s.device_info}</h4>
+                            <p className="text-xs text-slate-500 mt-1">IP: {s.ip_address}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Last active: {new Date(s.last_active).toLocaleString()}</p>
+                            {isCurrent && <span className="inline-block mt-2 text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Current Device</span>}
+                          </div>
+                          {!isCurrent && (
+                            <button onClick={() => handleRevokeSession(s.session_id)} className="p-2 bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl transition-colors">
+                              <LogOut size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
