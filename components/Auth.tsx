@@ -6,7 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 const GOOGLE_CLIENT_ID = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID || '257425560798-5ltn6vsrj4l5dl59t86j1sun05p6f6rf.apps.googleusercontent.com';
-const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://sepi-six.vercel.app' : '';
+const API_BASE_URL = Capacitor.isNativePlatform() ? 'https://sepi-restored.vercel.app' : '';
 
 interface AuthProps {
     onLogin: (token: string, user: any) => void;
@@ -61,10 +61,16 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
             let data;
             try {
-                data = await res.json();
-            } catch (jsonErr) {
+                const text = await res.text();
+                // Attempt to parse standard API response
+                try {
+                    data = JSON.parse(text);
+                } catch (jsonErr) {
+                    throw new Error(`Server returned non-API response: ${text.substring(0, 50)}...`);
+                }
+            } catch (networkErr) {
                 if (!res.ok) throw new Error("Backend server is offline! Restart terminal.");
-                throw new Error("Invalid response format from server");
+                throw networkErr;
             }
 
             if (!res.ok) {

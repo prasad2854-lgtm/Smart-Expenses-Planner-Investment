@@ -46,7 +46,7 @@ public class NotificationScraperService extends NotificationListenerService {
                 SharedPreferences prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
                 String token = prefs.getString("auth_token", null);
 
-                URL url = new URL("https://smart-income-planner.onrender.com/api/transactions/automated");
+                URL url = new URL("https://sepi-restored.vercel.app/api/transactions/automated");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
