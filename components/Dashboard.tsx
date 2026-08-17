@@ -23,7 +23,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onUpdate, onRefresh
   const isHomeOwner = !!state.hasOwnHouse;
   const [isScanning, setIsScanning] = useState(false);
   const [isBalanceExpanded, setIsBalanceExpanded] = useState(false);
-  const [expandedCard, setExpandedCard] = useState<'income' | 'expenses' | null>(null);
+  const [isIncomeExpanded, setIsIncomeExpanded] = useState(false);
+  const [isExpensesExpanded, setIsExpensesExpanded] = useState(false);
 
   const handleNativeScan = async () => {
     if (!onAddExpense) return;
@@ -140,21 +141,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onUpdate, onRefresh
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 items-start">
         <div
-          onClick={() => setExpandedCard(expandedCard === 'income' ? null : 'income')}
-          className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 cursor-pointer active:scale-95 transition-all hover:bg-slate-50"
+          onClick={() => setIsIncomeExpanded(!isIncomeExpanded)}
+          className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 cursor-pointer active:scale-95 transition-all hover:bg-slate-50 relative"
         >
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 bg-green-100 rounded-lg">
               <TrendingUp size={18} className="text-green-600" />
             </div>
             <span className="text-xs font-medium text-black opacity-60 flex-1">Income</span>
-            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{expandedCard === 'income' ? 'Close' : 'View'}</span>
+            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{isIncomeExpanded ? 'Close' : 'View'}</span>
           </div>
           <div className="text-xl font-bold text-black">{state.currency}{totalIncome.toLocaleString()}</div>
 
-          {expandedCard === 'income' && (
+          {isIncomeExpanded && (
             <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 animate-in slide-in-from-top-2 fade-in duration-300">
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Recent 5</p>
               {state.incomeSources.slice(-5).reverse().map((i) => (
@@ -171,19 +172,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onUpdate, onRefresh
         </div>
 
         <div
-          onClick={() => setExpandedCard(expandedCard === 'expenses' ? null : 'expenses')}
-          className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 cursor-pointer active:scale-95 transition-all hover:bg-slate-50"
+          onClick={() => setIsExpensesExpanded(!isExpensesExpanded)}
+          className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 cursor-pointer active:scale-95 transition-all hover:bg-slate-50 relative"
         >
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 bg-red-100 rounded-lg">
               <TrendingDown size={18} className="text-red-600" />
             </div>
             <span className="text-xs font-medium text-black opacity-60 flex-1">Expenses</span>
-            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{expandedCard === 'expenses' ? 'Close' : 'View'}</span>
+            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{isExpensesExpanded ? 'Close' : 'View'}</span>
           </div>
           <div className="text-xl font-bold text-black">{state.currency}{totalExpenses.toLocaleString()}</div>
 
-          {expandedCard === 'expenses' && (
+          {isExpensesExpanded && (
             <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 animate-in slide-in-from-top-2 fade-in duration-300">
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Recent 5</p>
               {activeExpenses.slice(-5).reverse().map((e) => (
