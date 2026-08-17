@@ -188,6 +188,9 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 
 app.get('/api/auth/sessions', authenticateToken, async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
         const result = await pool.query('SELECT session_id, device_info, ip_address, last_active, created_at FROM device_sessions WHERE user_id = $1 ORDER BY last_active DESC', [req.user.id]);
         res.json({ sessions: result.rows, currentSessionId: req.user.sessionId });
     } catch (err) {
