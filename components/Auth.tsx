@@ -52,10 +52,14 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         try {
             const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
             const body = isLogin ? { email, password } : { email, password, name };
+            const deviceHeader = Capacitor.isNativePlatform() ? `Smart Expenses Mobile App (${Capacitor.getPlatform()})` : navigator.userAgent;
 
             const res = await fetch(`${API_BASE_URL}${endpoint}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Device-Info': deviceHeader
+                },
                 body: JSON.stringify(body)
             });
 
@@ -90,9 +94,13 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     const handleGoogleSuccess = async (credentialResponse: any) => {
         setLoading(true);
         try {
+            const deviceHeader = Capacitor.isNativePlatform() ? `Smart Expenses Mobile App (${Capacitor.getPlatform()})` : navigator.userAgent;
             const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Device-Info': deviceHeader
+                },
                 body: JSON.stringify({ credential: credentialResponse.credential })
             });
 
@@ -113,9 +121,13 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         setLoading(true);
         try {
             const googleUser = await GoogleAuth.signIn();
+            const deviceHeader = Capacitor.isNativePlatform() ? `Smart Expenses Mobile App (${Capacitor.getPlatform()})` : navigator.userAgent;
             const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Device-Info': deviceHeader
+                },
                 body: JSON.stringify({ credential: googleUser.authentication.idToken })
             });
 

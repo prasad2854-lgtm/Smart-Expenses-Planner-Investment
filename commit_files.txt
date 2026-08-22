@@ -1,0 +1,61 @@
+commit 3b2b88efd7966e208aa6547fcb0549a9e4e1e3ed
+Author: prasad2854-lgtm <prasadv2854@gmail.com>
+Date:   Thu Aug 6 00:07:09 2026 +0530
+
+    fix(finance): finalize AI tracking algorithms
+
+M	.gitignore
+M	App.tsx
+M	android/app/build.gradle
+M	android/app/capacitor.build.gradle
+M	android/app/src/main/AndroidManifest.xml
+M	android/app/src/main/res/values/strings.xml
+M	android/build.gradle
+M	android/capacitor.settings.gradle
+M	android/gradle.properties
+M	android/gradle/wrapper/gradle-wrapper.properties
+A	android/gradle_error.txt
+A	android/manifest_error.txt
+A	android/report.txt
+R088	server/db.js	api/db.js
+R092	server/index.js	api/index.js
+A	build_error.txt
+M	capacitor.config.ts
+A	check-pro.js
+M	components/Auth.tsx
+M	components/BudgetPlanner.tsx
+A	components/DebtPlanner.tsx
+M	components/ExpenseList.tsx
+M	components/IncomeList.tsx
+M	components/Insights.tsx
+A	components/RecurringSetup.tsx
+M	components/Settings.tsx
+A	components/Settings_original.tsx
+M	constants.ts
+A	error.txt
+A	force_push.txt
+A	git_error.json
+A	git_status.txt
+A	gradle_error.txt
+M	index.html
+M	index.tsx
+A	logcat.txt
+A	logcat_utf8.txt
+M	manifest.json
+M	metadata.json
+M	package-lock.json
+M	package.json
+A	push-env.js
+A	push_error.txt
+A	push_feature_err.txt
+A	push_feature_out.txt
+A	report_utf8.txt
+M	services/geminiService.ts
+A	test_models.js
+A	test_models.out
+A	test_prompt.js
+M	types.ts
+A	utils/financeCalculations.ts
+A	vercel.json
+A	vercel_err.txt
+A	vercel_out.txt

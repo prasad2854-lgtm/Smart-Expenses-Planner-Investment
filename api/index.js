@@ -72,7 +72,7 @@ app.post('/api/auth/register', async (req, res) => {
         const user = result.rows[0];
 
         const sessionId = crypto.randomUUID();
-        const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
+        const deviceInfo = req.headers['x-device-info'] || req.headers['user-agent'] || 'Unknown Device';
         const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown IP';
 
         await pool.query(
@@ -109,7 +109,7 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const sessionId = crypto.randomUUID();
-        const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
+        const deviceInfo = req.headers['x-device-info'] || req.headers['user-agent'] || 'Unknown Device';
         const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown IP';
 
         await pool.query(
@@ -156,7 +156,7 @@ app.post('/api/auth/google', async (req, res) => {
         }
 
         const sessionId = crypto.randomUUID();
-        const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
+        const deviceInfo = req.headers['x-device-info'] || req.headers['user-agent'] || 'Unknown Device';
         const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'Unknown IP';
 
         await pool.query(
