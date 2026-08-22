@@ -376,6 +376,12 @@ export const Settings: React.FC<SettingsProps> = ({ state, onUpdate, onUpdatePro
                       Revoke All Unknown Devices
                     </button>
                   )}
+                  {activeSessions.length === 0 && (
+                    <div className="text-center p-8 bg-white rounded-2xl border border-slate-100 italic">
+                      <p className="text-slate-500 font-medium text-sm">No active sessions found.</p>
+                      <p className="text-slate-400 text-xs mt-2">If you logged in previously, please log out and log back in to enable advanced session tracking.</p>
+                    </div>
+                  )}
                   {activeSessions.map((s, idx) => {
                     const isCurrent = s.session_id === currentSessionId;
                     return (
